@@ -8,10 +8,14 @@ import os
 user = 'sys'
 password = 'cohesity'
 host = '10.14.69.121'
-db_name = 'prod'.upper()
-total_size = '100M'
-datafile_size = '20M'
+db_name = 'prodsb1'.upper()
+total_size = '200M'
+datafile_size = '100M'
 batch_size = 100000
+
+# todo: random datafile size adding to total size
+# todo: multiprocessing in batching
+# todo: datachurn
 
 def human_read_to_byte(size):
     # if no space in between retry
@@ -86,7 +90,9 @@ def create_todo_item_table(connection, db_name, datafile_size):
                 TABLESPACE {tablespace_name}""")
     print('created table todoitem')
 
-def pump_data(connection, db_name, total_size, datafile_size, batch_size):
+def pump_data(connection, db_name, total_size, datafile_size, batch_size, create_table=True):
+    if create_table:
+        create_todo_item_table(connection, db_name, datafile_size)
     ascii_letters = list(string.ascii_letters)
     rows = []
     toggle = 0
@@ -116,7 +122,7 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size):
                             print('failed to insert data due to lack of space in tablespace')
                             print(f'extending tablespace by {datafile_size}')
                             # increase tablespace size by adding a new datafile
-                            cmd = f"""ALTER TABLESPACE todoitemts ADD DATAFILE '{datafile_dir}/todoitemts_{curr_number_of_datafile}.dbf' SIZE {datafile_size}"""
+                            cmd = f"""ALTER TABLESPACE todoitemts ADD DATAFILE '{datafile_dir}/todoitemts_{random_string}.dbf' SIZE {datafile_size}"""
                             cursor.execute(cmd)
                             curr_number_of_datafile += 1
                             print('tablespace successfully increased')
@@ -132,5 +138,4 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size):
 
 if __name__ == '__main__':
     connection = connect_to_oracle(user,password,host,db_name)
-    create_todo_item_table(connection, db_name, datafile_size)
-    pump_data(connection, db_name, total_size, datafile_size, batch_size)
+    pump_data(connection, db_name, total_size, datafile_size, batch_size, create_table=True)
