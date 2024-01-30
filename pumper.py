@@ -1,36 +1,28 @@
 import random
 import string
 import sys
+import time
+
 import oracledb
 from oracledb.exceptions import DatabaseError
 import os
+import concurrent.futures
+from threading import Lock
+
+from utils.memory import human_read_to_byte, get_number_of_rows_from_file_size
 
 user = 'sys'
 password = 'cohesity'
 host = '10.14.69.121'
 db_name = 'prodsb1'.upper()
-total_size = '200M'
+total_size = '500M'
 datafile_size = '100M'
 batch_size = 100000
 
+# todo: put argparse
 # todo: random datafile size adding to total size
-# todo: multiprocessing in batching
 # todo: datachurn
-
-def human_read_to_byte(size):
-    # if no space in between retry
-    size_name = ("B", "K", "M", "G", "T", "P", "E", "Z", "Y")
-    i = 0
-    while i < len(size):
-        if size[i].isnumeric():
-            i += 1
-        else:
-            break
-    size = size[:i], size[i:]              # divide '1 GB' into ['1', 'GB']
-    num, unit = int(size[0]), size[1]
-    idx = size_name.index(unit)        # index in list of sizes determines power to raise it to
-    factor = 1024 ** idx               # ** is the "exponent" operator - you can use it instead of math.pow()
-    return num * factor
+# todo: refactor coding modules
 
 def connect_to_oracle(user, password, host, db_name):
     connection = oracledb.connect(
@@ -90,50 +82,107 @@ def create_todo_item_table(connection, db_name, datafile_size):
                 TABLESPACE {tablespace_name}""")
     print('created table todoitem')
 
-def pump_data(connection, db_name, total_size, datafile_size, batch_size, create_table=True):
-    if create_table:
-        create_todo_item_table(connection, db_name, datafile_size)
-    ascii_letters = list(string.ascii_letters)
-    rows = []
+def get_curr_number_of_datafile(connection):
+    with connection.cursor() as cursor:
+        cmd = "select count(file_name) from dba_data_files where tablespace_name='TODOITEMTS'"
+        cursor.execute(cmd)
+        res = cursor.fetchone()
+    return res[0]
+
+
+def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_number, lock, rows=None):
+    if not rows:
+        rows = []
     toggle = 0
-    datafile_dir = get_datafile_dir(connection,db_name )
-    curr_number_of_datafile = 1
-    target_number_of_datafile = human_read_to_byte(total_size) // human_read_to_byte(datafile_size)
-    total_rows = 0
-    print('creating rows')
-    while True:
-        task_number = random.randint(1, sys.maxsize)
-        random_string = ''.join(random.choices(ascii_letters, k=10))
-        row = (f'Task:{total_rows + 1}', toggle, task_number, random_string)
-        rows.append(row)
-        total_rows += 1
-        toggle = int(not toggle)
-        if total_rows % batch_size == 0:
-            print('inserting batch')
-            with connection.cursor() as cursor:
+    ascii_letters = list(string.ascii_letters)
+    if len(rows) < 1:
+        for i in range(batch_size):
+            task_number = random.randint(1, sys.maxsize)
+            random_string = ''.join(random.choices(ascii_letters, k=10))
+            row = (f'Task:{i + 1}', toggle, task_number, random_string)
+            rows.append(row)
+            toggle = int(not toggle)
+    with connection.cursor() as cursor:
+        print('inserting batch number - :{}'.format(batch_number))
+        try:
+            cursor.executemany(
+                "insert into todoitem (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
+
+        except DatabaseError as e:
+            if 'unable to extend' in str(e):
+                # acquire lock
+                if not lock.locked():
+                    start = time.time()
+                    lock.acquire()
+                    try:
+                        print(f'acquired lock by batch number - :{batch_number}')
+                        print('failed to insert data due to lack of space in tablespace')
+                        print(f'extending tablespace by {datafile_size}')
+                        # increase tablespace size by adding a new datafile
+                        random_string = ''.join(random.choices(ascii_letters, k=10))
+                        cmd = f"""ALTER TABLESPACE todoitemts ADD DATAFILE '{datafile_dir}/todoitemts_{random_string}.dbf' SIZE {datafile_size}"""
+                        cursor.execute(cmd)
+                        print('tablespace successfully increased')
+                        cursor.executemany(
+                            "insert into todoitem (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)",
+                            rows)
+                        print(f'lock released by batch number- :{batch_number}')
+                        lock.release()
+                        end = time.time()
+                        print(f'lock is held by batch - :{batch_number} for - {end - start} secs')
+                    except Exception as e:
+                        print(f'got exception - {e} - batch number - :{batch_number}')
+                        lock.release()
+
+
+                # if some other thread is acquiring lock
+                else:
+                    while lock.locked():
+                        sleep_time = random.randint(60, 120)
+                        print(f'batch number - :{batch_number} is going to sleep for {sleep_time} secs since tablespace is expanding')
+                        time.sleep(sleep_time)
                     try:
                         cursor.executemany(
-                            "insert into todoitem (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
+                            "insert into todoitem (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)",
+                            rows)
+                        print(f'committing batch number - :{batch_number}')
                     except DatabaseError as e:
                         if 'unable to extend' in str(e):
-                            if curr_number_of_datafile >= target_number_of_datafile:
-                                print(f'Total {curr_number_of_datafile} datafiles of size - {datafile_size} created, target met, exiting...')
-                                break
-                            print('failed to insert data due to lack of space in tablespace')
-                            print(f'extending tablespace by {datafile_size}')
-                            # increase tablespace size by adding a new datafile
-                            cmd = f"""ALTER TABLESPACE todoitemts ADD DATAFILE '{datafile_dir}/todoitemts_{random_string}.dbf' SIZE {datafile_size}"""
-                            cursor.execute(cmd)
-                            curr_number_of_datafile += 1
-                            print('tablespace successfully increased')
-                            cursor.executemany(
-                                "insert into todoitem (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)",
-                                rows)
-            connection.commit()
-            print(f'insertion completed - total rows inserted - {total_rows}')
-            # check error and extend
-            rows = []
-    print(f"Rows Inserted - {total_rows}")
+                            print(f'batch - :{batch_number} is going to recursion')
+                            # go to recursion
+                            process_batch(connection, datafile_dir, datafile_size, batch_size, batch_number, lock, rows)
+                            return
+    connection.commit()
+    return
+
+def pump_data(connection, db_name, total_size, datafile_size, batch_size, create_table=False):
+    if create_table:
+        create_todo_item_table(connection, db_name, datafile_size)
+    datafile_dir = get_datafile_dir(connection,db_name)
+    target_number_of_datafile = human_read_to_byte(total_size) // human_read_to_byte(datafile_size)
+    total_rows_required = get_number_of_rows_from_file_size(total_size)
+    number_of_batches = total_rows_required // batch_size
+    future_to_batch = {}
+    workers = min(128, number_of_batches)
+    print('number of workers - {}'.format(workers))
+    lock = Lock()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        for batch_number in range(1, number_of_batches+1):
+            arg = (connection, datafile_dir, datafile_size, batch_size, batch_number, lock)
+            future_to_batch[executor.submit(process_batch, *arg)] = batch_number
+
+    result = []
+    for future in concurrent.futures.as_completed(future_to_batch):
+        batch_number = future_to_batch[future]
+        try:
+            res = future.result()
+            if not res:
+                result.append(batch_number)
+        except Exception as exc:
+            print("%r generated an exception: %s" % (batch_number, exc))
+            # todo: handle here sequentially for error batches
+
+    return result
 
 
 if __name__ == '__main__':
