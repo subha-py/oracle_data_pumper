@@ -11,15 +11,25 @@ from threading import Lock
 
 from utils.memory import human_read_to_byte, get_number_of_rows_from_file_size
 
-user = 'sys'
-password = 'cohesity'
-host = '10.14.69.121'
-db_name = 'prodsb1'.upper()
-total_size = '500M'
-datafile_size = '100M'
-batch_size = 100000
+import argparse
 
-# todo: put argparse
+parser = argparse.ArgumentParser(description='A program to populate a db in oracle',
+                                 usage='python3 pumper.py --host 10.14.69.121 --db_name prodsb21 --user sys --password cohesity --total_size 1G --datafile_size 200M --batch_size 200000 ')
+parser._action_groups.pop()
+required = parser.add_argument_group('required arguments')
+optional = parser.add_argument_group('optional arguments')
+
+required.add_argument('--host', help='ip/hostname of the db', type=str, required=True)
+required.add_argument('--db_name', help='name of database', type=str, required=True)
+optional.add_argument('--user', help='username of db (default:sys)', default='sys', type=str)
+optional.add_argument('--password', help='password of db (default:cohesity)', default='cohesity', type=str)
+optional.add_argument('--total_size', help='total size to be pumped (default:1G)', default='1G', type=str)
+optional.add_argument('--datafile_size', help='size of datafile (default:200M)', default='200M', type=str)
+optional.add_argument('--batch_size', help='number of rows in each batch (default:200000)', default=200000, type=int)
+parser.add_argument('--create_table', action='store_true')
+parser.add_argument('--no_create_table', dest='create_table', action='store_false')
+
+
 # todo: random datafile size adding to total size
 # todo: datachurn
 # todo: refactor coding modules
@@ -34,7 +44,8 @@ def connect_to_oracle(user, password, host, db_name):
 
     return connection
 
-def delete_todoitem_table(connection, tablename = 'todoitem'):
+
+def delete_todoitem_table(connection, tablename='todoitem'):
     with connection.cursor() as cursor:
         cursor.execute(f"""
             begin
@@ -47,6 +58,8 @@ def delete_todoitem_table(connection, tablename = 'todoitem'):
             if "does not exist" in str(e):
                 return
         print(f'deleted table - {tablename}')
+
+
 def get_datafile_dir(connection, db_name):
     print('Fetching datafile location')
     with connection.cursor() as cursor:
@@ -55,6 +68,8 @@ def get_datafile_dir(connection, db_name):
     result = os.path.join(result, db_name, 'datafile')
     print(f'Got datafile location - {result}')
     return result
+
+
 def create_tablespace(connection, db_name, datafile_size):
     tablespace_name = 'todoitemts'
     datafile_path = os.path.join(get_datafile_dir(connection, db_name), tablespace_name)
@@ -64,6 +79,7 @@ def create_tablespace(connection, db_name, datafile_size):
         cursor.execute(cmd)
     print(f'tablespace created with name - {tablespace_name}')
     return tablespace_name
+
 
 def create_todo_item_table(connection, db_name, datafile_size):
     delete_todoitem_table(connection)
@@ -81,6 +97,7 @@ def create_todo_item_table(connection, db_name, datafile_size):
                 primary key (id))
                 TABLESPACE {tablespace_name}""")
     print('created table todoitem')
+
 
 def get_curr_number_of_datafile(connection):
     with connection.cursor() as cursor:
@@ -139,7 +156,8 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
                 else:
                     while lock.locked():
                         sleep_time = random.randint(60, 120)
-                        print(f'batch number - :{batch_number} is going to sleep for {sleep_time} secs since tablespace is expanding')
+                        print(
+                            f'batch number - :{batch_number} is going to sleep for {sleep_time} secs since tablespace is expanding')
                         time.sleep(sleep_time)
                     try:
                         cursor.executemany(
@@ -155,10 +173,11 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
     connection.commit()
     return
 
+
 def pump_data(connection, db_name, total_size, datafile_size, batch_size, create_table=False):
     if create_table:
         create_todo_item_table(connection, db_name, datafile_size)
-    datafile_dir = get_datafile_dir(connection,db_name)
+    datafile_dir = get_datafile_dir(connection, db_name)
     target_number_of_datafile = human_read_to_byte(total_size) // human_read_to_byte(datafile_size)
     total_rows_required = get_number_of_rows_from_file_size(total_size)
     number_of_batches = total_rows_required // batch_size
@@ -167,7 +186,7 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size, create
     print('number of workers - {}'.format(workers))
     lock = Lock()
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-        for batch_number in range(1, number_of_batches+1):
+        for batch_number in range(1, number_of_batches + 1):
             arg = (connection, datafile_dir, datafile_size, batch_size, batch_number, lock)
             future_to_batch[executor.submit(process_batch, *arg)] = batch_number
 
@@ -186,5 +205,7 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size, create
 
 
 if __name__ == '__main__':
-    connection = connect_to_oracle(user,password,host,db_name)
-    pump_data(connection, db_name, total_size, datafile_size, batch_size, create_table=True)
+    result = parser.parse_args()
+    connection = connect_to_oracle(result.user, result.password, result.host, result.db_name.upper())
+    pump_data(connection, result.db_name.upper(), result.total_size, result.datafile_size, result.batch_size,
+              create_table=result.create_table)
