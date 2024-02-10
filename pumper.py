@@ -175,7 +175,7 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
     return
 
 
-def pump_data(connection, db_name, total_size, datafile_size, batch_size, create_table=False):
+def pump_data(connection, db_name, total_size, datafile_size, batch_size, create_table=False, max_threads=128):
     if create_table:
         create_todo_item_table(connection, db_name, datafile_size)
     datafile_dir = get_datafile_dir(connection, db_name)
@@ -183,7 +183,7 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size, create
     total_rows_required = get_number_of_rows_from_file_size(total_size)
     number_of_batches = total_rows_required // batch_size
     future_to_batch = {}
-    workers = min(128, number_of_batches)
+    workers = min(max_threads, number_of_batches)
     print('number of workers - {}'.format(workers))
     lock = Lock()
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
@@ -209,4 +209,4 @@ if __name__ == '__main__':
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host, result.db_name.upper())
     pump_data(connection, result.db_name.upper(), result.total_size, result.datafile_size, result.batch_size,
-              create_table=result.create_table)
+              create_table=result.create_table, max_threads=result.threads)
