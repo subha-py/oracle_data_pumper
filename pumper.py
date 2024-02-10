@@ -2,6 +2,7 @@ import random
 import string
 import sys
 import time
+import datetime
 
 import oracledb
 from oracledb.exceptions import DatabaseError
@@ -121,7 +122,7 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
             rows.append(row)
             toggle = int(not toggle)
     with connection.cursor() as cursor:
-        print('inserting batch number - :{}'.format(batch_number))
+        print('{}: inserting batch number - :{}'.format(datetime.datetime.now(), batch_number))
         try:
             cursor.executemany(
                 "insert into todoitem (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
@@ -158,7 +159,7 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
                     while lock.locked():
                         sleep_time = random.randint(60, 120)
                         print(
-                            f'batch number - :{batch_number} is going to sleep for {sleep_time} secs since tablespace is expanding')
+                            f'{datetime.datetime.now()}: batch number - :{batch_number} is going to sleep for {sleep_time} secs since tablespace is expanding')
                         time.sleep(sleep_time)
                     try:
                         cursor.executemany(
