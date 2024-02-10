@@ -25,9 +25,10 @@ optional.add_argument('--user', help='username of db (default:sys)', default='sy
 optional.add_argument('--password', help='password of db (default:cohesity)', default='cohesity', type=str)
 optional.add_argument('--total_size', help='total size to be pumped (default:1G)', default='1G', type=str)
 optional.add_argument('--datafile_size', help='size of datafile (default:200M)', default='200M', type=str)
-optional.add_argument('--batch_size', help='number of rows in each batch (default:200000)', default=200000, type=int)
-parser.add_argument('--create_table', action='store_true')
-parser.add_argument('--no_create_table', dest='create_table', action='store_false')
+optional.add_argument('--batch_size', help='number of rows in each batch (default:200000)', default=100000, type=int)
+optional.add_argument('--create_table', action='store_true')
+optional.add_argument('--no_create_table', dest='create_table', action='store_false')
+optional.add_argument('--threads', help='number of threads (default:128)', default=128, type=int)
 
 
 # todo: random datafile size adding to total size
