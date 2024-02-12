@@ -165,13 +165,14 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
                         cursor.executemany(
                             "insert into todoitem (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)",
                             rows)
-                        print(f'committing batch number - :{batch_number}')
+
                     except DatabaseError as e:
                         if 'unable to extend' in str(e):
                             print(f'batch - :{batch_number} is going to recursion')
                             # go to recursion
                             process_batch(connection, datafile_dir, datafile_size, batch_size, batch_number, lock, rows)
                             return
+    print(f'committing batch number - :{batch_number}')
     connection.commit()
     return
 
