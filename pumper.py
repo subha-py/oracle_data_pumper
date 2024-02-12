@@ -122,7 +122,7 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
             rows.append(row)
             toggle = int(not toggle)
     with connection.cursor() as cursor:
-        print('{}: inserting batch number - :{}//{}'.format(datetime.datetime.now(), batch_number, number_of_batches))
+        print('{}: inserting batch number - :{}/{}'.format(datetime.datetime.now(), batch_number, number_of_batches))
         try:
             cursor.executemany(
                 "insert into todoitem (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
@@ -134,7 +134,7 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
                     start = time.time()
                     lock.acquire()
                     try:
-                        print(f'acquired lock by batch number - :{batch_number}//{number_of_batches}')
+                        print(f'acquired lock by batch number - :{batch_number}/{number_of_batches}')
                         print('failed to insert data due to lack of space in tablespace')
                         print(f'extending tablespace by {datafile_size}')
                         # increase tablespace size by adding a new datafile
@@ -145,12 +145,12 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
                         cursor.executemany(
                             "insert into todoitem (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)",
                             rows)
-                        print(f'lock released by batch number- :{batch_number}//{number_of_batches}')
+                        print(f'lock released by batch number- :{batch_number}/{number_of_batches}')
                         lock.release()
                         end = time.time()
-                        print(f'lock is held by batch - :{batch_number}//{number_of_batches} for - {end - start} secs')
+                        print(f'lock is held by batch - :{batch_number}/{number_of_batches} for - {end - start} secs')
                     except Exception as e:
-                        print(f'got exception - {e} - batch number - :{batch_number}//{number_of_batches}')
+                        print(f'got exception - {e} - batch number - :{batch_number}/{number_of_batches}')
                         lock.release()
 
 
@@ -159,7 +159,7 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
                     while lock.locked():
                         sleep_time = random.randint(180, 300)
                         print(
-                            f'{datetime.datetime.now()}: batch number - :{batch_number}//{number_of_batches} is going to sleep for {sleep_time} secs since tablespace is expanding')
+                            f'{datetime.datetime.now()}: batch number - :{batch_number}/{number_of_batches} is going to sleep for {sleep_time} secs since tablespace is expanding')
                         time.sleep(sleep_time)
                     try:
                         cursor.executemany(
@@ -168,11 +168,11 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
 
                     except DatabaseError as e:
                         if 'unable to extend' in str(e):
-                            print(f'batch - :{batch_number}//{number_of_batches} is going to recursion')
+                            print(f'batch - :{batch_number}/{number_of_batches} is going to recursion')
                             # go to recursion
-                            process_batch(connection, datafile_dir, datafile_size, batch_size, batch_number, lock, rows)
+                            process_batch(connection, datafile_dir, datafile_size, batch_size, batch_number, lock, rows, number_of_batches)
                             return
-    print(f'committing batch number - :{batch_number}//{number_of_batches}')
+    print(f'committing batch number - :{batch_number}/{number_of_batches}')
     connection.commit()
     return
 
@@ -190,7 +190,7 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size, create
     lock = Lock()
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         for batch_number in range(1, number_of_batches + 1):
-            arg = (connection, datafile_dir, datafile_size, batch_size, batch_number, lock, number_of_batches)
+            arg = (connection, datafile_dir, datafile_size, batch_size, batch_number, lock, None, number_of_batches)
             future_to_batch[executor.submit(process_batch, *arg)] = batch_number
 
     result = []
