@@ -157,7 +157,7 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
                 # if some other thread is acquiring lock
                 else:
                     while lock.locked():
-                        sleep_time = random.randint(60, 120)
+                        sleep_time = random.randint(180, 300)
                         print(
                             f'{datetime.datetime.now()}: batch number - :{batch_number} is going to sleep for {sleep_time} secs since tablespace is expanding')
                         time.sleep(sleep_time)
