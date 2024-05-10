@@ -129,6 +129,7 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size, batch_num
 
         except DatabaseError as e:
             if 'unable to extend' in str(e):
+                return
                 # acquire lock
                 if not lock.locked():
                     start = time.time()
