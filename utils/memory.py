@@ -9,8 +9,10 @@ def human_read_to_byte(size):
             break
     size = size[:i], size[i:]              # divide '1 GB' into ['1', 'GB']
     num, unit = int(size[0]), size[1]
-    idx = size_name.index(unit)        # index in list of sizes determines power to raise it to
-    factor = 1024 ** idx               # ** is the "exponent" operator - you can use it instead of math.pow()
+    idx = size_name.index(unit)
+    # index in list of sizes determines power to raise it to
+    factor = 1024 ** idx
+    # ** is the "exponent" operator - you can use it instead of math.pow()
     return num * factor
 
 def get_number_of_rows_from_file_size(size):
