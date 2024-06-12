@@ -77,15 +77,15 @@ def process_batch(connection, batch_size, batch_number, rows=None,
     with connection.cursor() as cursor:
         print('{}: updating batch number - :{}/{}'.format(
             datetime.datetime.now(), batch_number, number_of_batches))
-        sql_update = ("update todoitem set done = :1,randomnumber = :2\
+        sql_update = ("update todoitem set done = :1,randomnumber = :2,\
                       randomstring = :3  where id = :4")
         try:
             cursor.executemany(sql_update, rows, batcherrors=True)
+        except Exception as ex:
             for error in cursor.getbatcherrors():
                 print("{} :Error batch number - :{}/{}".format(
             datetime.datetime.now(), batch_number, number_of_batches),
                   error.message, "at row offset", error.offset)
-        except Exception as ex:
             print(ex)
     print('{}: committing batch number - :{}/{}'.format(
         datetime.datetime.now(),batch_number,number_of_batches))

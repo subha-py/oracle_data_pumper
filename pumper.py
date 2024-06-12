@@ -174,7 +174,7 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
                         random_string = ''.join(
                             random.choices(ascii_letters, k=10))
                         cmd = f"""ALTER TABLESPACE todoitemts ADD DATAFILE \
-                        '{datafile_dir}/todoitemts_{random_string}.dbf \
+                        '{datafile_dir}/todoitemts_{random_string}.dbf' \
                         SIZE {datafile_size}"""
                         cursor.execute(cmd)
                         print('tablespace successfully increased')
@@ -191,6 +191,18 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
                             f'lock is held by batch \
                              - :{batch_number}/{number_of_batches} \
                              for - {end - start} secs')
+                    except DatabaseError as e:
+                        if 'unable to extend' in str(e):
+                            lock.release()
+                            print(
+                                f'batch - :{batch_number}/{number_of_batches} \
+                                is going to recursion')
+                            # go to recursion
+                            process_batch(connection, datafile_dir,
+                                          datafile_size, batch_size,
+                                          batch_number, lock, rows,
+                                          number_of_batches)
+                            return
                     except Exception as e:
                         print(
                             f'got exception - {e} - batch number - \
