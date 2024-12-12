@@ -42,12 +42,11 @@ optional.add_argument('--datafile_size',
 optional.add_argument('--batch_size',
                       help='number of rows in each batch (default:200000)',
                       default=100000, type=int)
-optional.add_argument('--create_table', action='store_true')
-optional.add_argument('--no_create_table', dest='create_table',
-                      action='store_false')
 optional.add_argument('--threads',
                       help='number of threads (default:128)',
                       default=128, type=int)
+parser.add_argument('--connect_only', nargs='?', default=False, const=True)
+parser.add_argument('--create_table', nargs='?', default=False, const=True)
 
 
 # todo: random datafile size adding to total size
@@ -95,7 +94,7 @@ def get_datafile_dir(connection, db_name):
 
 
 def create_tablespace(connection, db_name, datafile_size):
-    tablespace_name = 'todoitemts'
+    tablespace_name = 'todoitemts123'
     datafile_path = os.path.join(get_datafile_dir(connection, db_name),
                                  tablespace_name)
     cmd = (f"create tablespace {tablespace_name} \
@@ -282,6 +281,8 @@ if __name__ == '__main__':
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host,
                                    result.db_name.upper())
+    if result.connect_only:
+        sys.exit(0)
     pump_data(connection, result.db_name.upper(), result.total_size,
               result.datafile_size, result.batch_size,
               create_table=result.create_table, max_threads=result.threads)
