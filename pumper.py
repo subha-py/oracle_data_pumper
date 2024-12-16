@@ -94,7 +94,7 @@ def get_datafile_dir(connection, db_name):
 
 
 def create_tablespace(connection, db_name, datafile_size):
-    tablespace_name = 'todoitemts123'
+    tablespace_name = 'todoitemts'
     datafile_path = os.path.join(get_datafile_dir(connection, db_name),
                                  tablespace_name)
     cmd = (f"create tablespace {tablespace_name} \
