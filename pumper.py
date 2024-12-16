@@ -11,7 +11,7 @@ import concurrent.futures
 from threading import Lock
 
 from utils.memory import human_read_to_byte, get_number_of_rows_from_file_size
-
+from utils.bct import enable_bct
 import argparse
 
 parser = argparse.ArgumentParser(
@@ -47,7 +47,7 @@ optional.add_argument('--threads',
                       default=128, type=int)
 parser.add_argument('--connect_only', nargs='?', default=False, const=True)
 parser.add_argument('--create_table', nargs='?', default=False, const=True)
-
+parser.add_argument('--enable_bct', nargs='?', default=False, const=True)
 
 # todo: random datafile size adding to total size
 # todo: datachurn
@@ -282,6 +282,9 @@ if __name__ == '__main__':
     connection = connect_to_oracle(result.user, result.password, result.host,
                                    result.db_name.upper())
     if result.connect_only:
+        sys.exit(0)
+    if result.enable_bct:
+        enable_bct(connection)
         sys.exit(0)
     pump_data(connection, result.db_name.upper(), result.total_size,
               result.datafile_size, result.batch_size,
