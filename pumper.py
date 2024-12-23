@@ -10,7 +10,12 @@ import os
 import concurrent.futures
 from threading import Lock
 
-from utils.memory import human_read_to_byte, get_number_of_rows_from_file_size
+from utils.memory import (
+    human_read_to_byte,
+    get_number_of_rows_from_file_size,
+    set_recovery_file_dest_size
+)
+
 from utils.bct import enable_bct
 import argparse
 
@@ -45,6 +50,9 @@ optional.add_argument('--batch_size',
 optional.add_argument('--threads',
                       help='number of threads (default:128)',
                       default=128, type=int)
+optional.add_argument('--dest_recovery_size',
+                      help='dest_recovery_size (default: 100G)',
+                      default='500G', type=str)
 parser.add_argument('--connect_only', nargs='?', default=False, const=True)
 parser.add_argument('--create_table', nargs='?', default=False, const=True)
 parser.add_argument('--enable_bct', nargs='?', default=False, const=True)
@@ -106,7 +114,8 @@ def create_tablespace(connection, db_name, datafile_size):
     return tablespace_name
 
 
-def create_todo_item_table(connection, db_name, datafile_size):
+def create_todo_item_table(connection, db_name, datafile_size, dest_recovery_size):
+    set_recovery_file_dest_size(connection, dest_recovery_size)
     delete_todoitem_table(connection)
     tablespace_name = create_tablespace(connection, db_name, datafile_size)
     print('creating table todoitem')
@@ -242,9 +251,9 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
 
 
 def pump_data(connection, db_name, total_size, datafile_size, batch_size,
-              create_table=False, max_threads=128):
+              create_table=False, max_threads=128, dest_recovery_size='100G'):
     if create_table:
-        create_todo_item_table(connection, db_name, datafile_size)
+        create_todo_item_table(connection, db_name, datafile_size, dest_recovery_size)
     datafile_dir = get_datafile_dir(connection, db_name)
     target_number_of_datafile = human_read_to_byte(
         total_size) // human_read_to_byte(datafile_size)
@@ -288,4 +297,5 @@ if __name__ == '__main__':
         sys.exit(0)
     pump_data(connection, result.db_name.upper(), result.total_size,
               result.datafile_size, result.batch_size,
-              create_table=result.create_table, max_threads=result.threads)
+              create_table=result.create_table, max_threads=result.threads,
+              dest_recovery_size=result.dest_recovery_size)

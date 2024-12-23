@@ -1,3 +1,4 @@
+from oracledb.exceptions import DatabaseError
 def human_read_to_byte(size):
     # if no space in between retry
     size_name = ("B", "K", "M", "G", "T", "P", "E", "Z", "Y")
@@ -18,3 +19,11 @@ def human_read_to_byte(size):
 def get_number_of_rows_from_file_size(size):
     # current todoitem schema having 11638091 rows amounts to 1G size
     return 11638091 * human_read_to_byte(size) // human_read_to_byte('1G')
+
+def set_recovery_file_dest_size(connection, size):
+    print('changing recovery file dest size')
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"alter system set db_recovery_file_dest_size={size} scope=both")
+    print(f'db_recovery_file_dest_size changed to {size}')
+    return
