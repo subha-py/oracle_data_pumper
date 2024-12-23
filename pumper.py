@@ -4,7 +4,7 @@ import sys
 import time
 import datetime
 
-import oracledb
+
 from oracledb.exceptions import DatabaseError
 import os
 import concurrent.futures
@@ -16,61 +16,16 @@ from utils.memory import (
     set_recovery_file_dest_size,
     get_databse_size
 )
+from utils.connection import connect_to_oracle
 
 from utils.bct import enable_bct
 import argparse
-
-parser = argparse.ArgumentParser(
-    description='A program to populate a db in oracle',
-    usage='python3 pumper.py --host 10.14.69.121 --db_name prodsb21\
-            --user sys --password cohesity --total_size 1G \
-            --datafile_size 200M --batch_size 200000 ')
-parser._action_groups.pop()
-required = parser.add_argument_group('required arguments')
-optional = parser.add_argument_group('optional arguments')
-
-required.add_argument('--host', help='ip/hostname of the db',
-                      type=str, required=True)
-required.add_argument('--db_name', help='name of database',
-                      type=str, required=True)
-optional.add_argument('--user',
-                      help='username of db (default:sys)', default='sys',
-                      type=str)
-optional.add_argument('--password',
-                      help='password of db (default:cohesity)',
-                      default='cohesity', type=str)
-optional.add_argument('--total_size',
-                      help='total size to be pumped (default:1G)',
-                      default='1G', type=str)
-optional.add_argument('--datafile_size',
-                      help='size of datafile (default:200M)', default='200M',
-                      type=str)
-optional.add_argument('--batch_size',
-                      help='number of rows in each batch (default:200000)',
-                      default=100000, type=int)
-optional.add_argument('--threads',
-                      help='number of threads (default:128)',
-                      default=128, type=int)
-optional.add_argument('--dest_recovery_size',
-                      help='dest_recovery_size (default: 100G)',
-                      default='500G', type=str)
-parser.add_argument('--connect_only', nargs='?', default=False, const=True)
-parser.add_argument('--create_table', nargs='?', default=False, const=True)
-parser.add_argument('--enable_bct', nargs='?', default=False, const=True)
 
 # todo: random datafile size adding to total size
 # todo: datachurn
 # todo: refactor coding modules
 
-def connect_to_oracle(user, password, host, db_name):
-    connection = oracledb.connect(
-        user=user,
-        password=password,
-        dsn=f"{host}:1521/{db_name}", mode=oracledb.AUTH_MODE_SYSDBA)
 
-    print("Successfully connected to Oracle Database")
-
-    return connection
 
 
 def delete_todoitem_table(connection, tablename='todoitem'):
@@ -288,14 +243,46 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size,
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='A program to populate a db in oracle',
+        usage='python3 pumper.py --host 10.14.69.121 --db_name prodsb21\
+                --user sys --password cohesity --total_size 1G \
+                --datafile_size 200M --batch_size 200000 ')
+    parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
+    optional = parser.add_argument_group('optional arguments')
+
+    required.add_argument('--host', help='ip/hostname of the db',
+                          type=str, required=True)
+    required.add_argument('--db_name', help='name of database',
+                          type=str, required=True)
+    optional.add_argument('--user',
+                          help='username of db (default:sys)', default='sys',
+                          type=str)
+    optional.add_argument('--password',
+                          help='password of db (default:cohesity)',
+                          default='cohesity', type=str)
+    optional.add_argument('--total_size',
+                          help='total size to be pumped (default:1G)',
+                          default='1G', type=str)
+    optional.add_argument('--datafile_size',
+                          help='size of datafile (default:200M)',
+                          default='200M',
+                          type=str)
+    optional.add_argument('--batch_size',
+                          help='number of rows in each batch (default:200000)',
+                          default=100000, type=int)
+    optional.add_argument('--threads',
+                          help='number of threads (default:128)',
+                          default=128, type=int)
+    optional.add_argument('--dest_recovery_size',
+                          help='dest_recovery_size (default: 100G)',
+                          default='500G', type=str)
+
+
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host,
                                    result.db_name.upper())
-    if result.connect_only:
-        sys.exit(0)
-    if result.enable_bct:
-        enable_bct(connection)
-        sys.exit(0)
     pump_data(connection, result.db_name.upper(), result.total_size,
               result.datafile_size, result.batch_size,
               create_table=result.create_table, max_threads=result.threads,

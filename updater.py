@@ -1,36 +1,11 @@
-from pumper import connect_to_oracle
+from utils.connection import connect_to_oracle
 import string
 import random
 import sys
 import datetime
-import time
 import concurrent.futures
 import argparse
 
-parser = argparse.ArgumentParser(
-    description='A program to update a db in oracle',
-    usage='python3 updater.py --host 10.14.69.121 --db_name prodsb21\
-        --user sys --password cohesity --batch_size 200000 --max_threads 128')
-parser._action_groups.pop()
-required = parser.add_argument_group('required arguments')
-optional = parser.add_argument_group('optional arguments')
-
-required.add_argument('--host', help='ip/hostname of the db',
-                      type=str, required=True)
-required.add_argument('--db_name', help='name of database',
-                      type=str, required=True)
-optional.add_argument('--user',
-                      help='username of db (default:sys)',
-                      default='sys', type=str)
-optional.add_argument('--password',
-                      help='password of db (default:cohesity)',
-                      default='cohesity', type=str)
-optional.add_argument('--batch_size',
-                      help='number of rows in each batch (default:200000)',
-                      default=100000, type=int)
-optional.add_argument('--max_threads',
-                      help='number of threads (default:128)',
-                      default=128, type=int)
 
 
 def get_todoitem_tables(connection):
@@ -92,8 +67,8 @@ def process_batch(connection, batch_size, batch_number, rows=None,
     connection.commit()
 
 
-def pump_updates(connection, batch_size, max_threads=128):
-    total_rows = get_row_count(connection)
+def pump_updates(connection, batch_size, max_threads=128, percentage=10):
+    total_rows = get_row_count(connection) * percentage//100
     number_of_batches = total_rows // batch_size
     future_to_batch = {}
     workers = min(max_threads, number_of_batches)
@@ -119,6 +94,32 @@ def pump_updates(connection, batch_size, max_threads=128):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='A program to update a db in oracle',
+        usage='python3 updater.py --host 10.14.69.121 --db_name prodsb21\
+            --user sys --password cohesity --batch_size 200000 --max_threads 128')
+    parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
+    optional = parser.add_argument_group('optional arguments')
+
+    required.add_argument('--host', help='ip/hostname of the db',
+                          type=str, required=True)
+    required.add_argument('--db_name', help='name of database',
+                          type=str, required=True)
+    optional.add_argument('--user',
+                          help='username of db (default:sys)',
+                          default='sys', type=str)
+    optional.add_argument('--password',
+                          help='password of db (default:cohesity)',
+                          default='cohesity', type=str)
+    optional.add_argument('--batch_size',
+                          help='number of rows in each batch (default:200000)',
+                          default=100000, type=int)
+    optional.add_argument('--max_threads',
+                          help='number of threads (default:128)',
+                          default=128, type=int)
+
+
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host,
                                    result.db_name.upper())

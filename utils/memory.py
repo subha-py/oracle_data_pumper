@@ -33,6 +33,6 @@ def get_databse_size(connection):
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT SUM(bytes) / 1024 / 1024 / 1024 AS GB FROM dba_data_files")
-        value = cursor.fetchone()[0]
+        value = round(cursor.fetchone()[0])
     print(f'Total database size - {value}GB')
-    return value
+    return str(value) + 'G'
