@@ -13,7 +13,8 @@ from threading import Lock
 from utils.memory import (
     human_read_to_byte,
     get_number_of_rows_from_file_size,
-    set_recovery_file_dest_size
+    set_recovery_file_dest_size,
+    get_databse_size
 )
 
 from utils.bct import enable_bct

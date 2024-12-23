@@ -27,3 +27,12 @@ def set_recovery_file_dest_size(connection, size):
             f"alter system set db_recovery_file_dest_size={size} scope=both")
     print(f'db_recovery_file_dest_size changed to {size}')
     return
+
+def get_databse_size(connection):
+    print('querying database size')
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT SUM(bytes) / 1024 / 1024 / 1024 AS GB FROM dba_data_files")
+        value = cursor.fetchone()[0]
+    print(f'Total database size - {value}GB')
+    return value
