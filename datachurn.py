@@ -34,8 +34,8 @@ if __name__ == '__main__':
                           help='total size to be pumped (default:1G)',
                           default='1G', type=str)
     optional.add_argument('--datafile_size',
-                          help='size of datafile (default:200M)',
-                          default='200M',
+                          help='size of datafile (default:50G)',
+                          default='50G',
                           type=str)
     optional.add_argument('--batch_size',
                           help='number of rows in each batch (default:200000)',
