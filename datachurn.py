@@ -19,7 +19,7 @@ if __name__ == '__main__':
                           type=str, required=True)
     required.add_argument('--db_name', help='name of database',
                           type=str, required=True)
-    required.add_argument('--limit',
+    optional.add_argument('--limit',
                           help='''upper limit of database size, after that
                                    database will update old rows for data churn
                                    instead of creating new rows''',
