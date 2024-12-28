@@ -23,7 +23,7 @@ if __name__ == '__main__':
                           help='''upper limit of database size, after that
                                    database will update old rows for data churn
                                    instead of creating new rows''',
-                          type=str, required=True)
+                          type=str, default='100G')
     optional.add_argument('--user',
                           help='username of db (default:sys)', default='sys',
                           type=str)
