@@ -23,7 +23,7 @@ if __name__ == '__main__':
                           help='''upper limit of database size, after that
                                    database will update old rows for data churn
                                    instead of creating new rows''',
-                          type=str, default='50G')
+                          type=str, default='500G')
     optional.add_argument('--user',
                           help='username of db (default:sys)', default='sys',
                           type=str)
@@ -32,7 +32,7 @@ if __name__ == '__main__':
                           default='cohesity', type=str)
     optional.add_argument('--total_size',
                           help='total size to be pumped (default:1G)',
-                          default='1G', type=str)
+                          default='50G', type=str)
     optional.add_argument('--datafile_size',
                           help='size of datafile (default:50G)',
                           default='1G',
