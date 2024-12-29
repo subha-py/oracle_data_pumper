@@ -23,7 +23,7 @@ if __name__ == '__main__':
                           help='''upper limit of database size, after that
                                    database will update old rows for data churn
                                    instead of creating new rows''',
-                          type=str, default='100G')
+                          type=str, default='50G')
     optional.add_argument('--user',
                           help='username of db (default:sys)', default='sys',
                           type=str)
@@ -35,14 +35,14 @@ if __name__ == '__main__':
                           default='1G', type=str)
     optional.add_argument('--datafile_size',
                           help='size of datafile (default:50G)',
-                          default='50G',
+                          default='1G',
                           type=str)
     optional.add_argument('--batch_size',
                           help='number of rows in each batch (default:200000)',
                           default=100000, type=int)
     optional.add_argument('--threads',
                           help='number of threads (default:128)',
-                          default=10, type=int)
+                          default=32, type=int)
     optional.add_argument('--dest_recovery_size',
                           help='dest_recovery_size (default: 100G)',
                           default='500G', type=str)
