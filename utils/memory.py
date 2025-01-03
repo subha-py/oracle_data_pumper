@@ -31,8 +31,17 @@ def set_recovery_file_dest_size(connection, size):
 def get_databse_size(connection):
     print('querying database size')
     with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT SUM(bytes) / 1024 / 1024 / 1024 AS GB FROM dba_data_files")
+        try:
+            cursor.execute(
+                "SELECT SUM(bytes) / 1024 / 1024 / 1024 AS GB FROM dba_data_files")
+        except DatabaseError as e:
+            if 'ORA-01219' in str(e):
+                cursor.execute(
+                    'select con_id, name, open_mode, total_size/1024/1024/1024 "PDB_SIZE_GB" from v$pdbs;')
+                value = cursor.fetchone()
+                print(value)
+            else:
+                raise e
         value = round(cursor.fetchone()[0])
     print(f'Total database size - {value}GB')
     return str(value) + 'G'
