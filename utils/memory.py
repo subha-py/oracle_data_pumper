@@ -37,7 +37,7 @@ def get_databse_size(connection):
         except DatabaseError as e:
             if 'ORA-01219' in str(e):
                 cursor.execute(
-                    'select con_id, name, open_mode, total_size/1024/1024/1024 "PDB_SIZE_GB" from v$pdbs;')
+                    'select con_id, name, open_mode, total_size/1024/1024/1024 "PDB_SIZE_GB" from v$pdbs')
                 value = cursor.fetchone()
                 print(value)
             else:
