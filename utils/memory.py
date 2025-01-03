@@ -39,7 +39,7 @@ def get_databse_size(connection):
                 cursor.execute(
                     'select total_size/1024/1024/1024 "PDB_SIZE_GB" from v$pdbs')
                 value = cursor.fetchone()
-                print(value)
+                print(type(value))
             else:
                 raise e
         value = round(cursor.fetchone()[0])
