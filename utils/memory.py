@@ -38,10 +38,8 @@ def get_databse_size(connection):
             if 'ORA-01219' in str(e):
                 cursor.execute(
                     'select total_size/1024/1024/1024 "PDB_SIZE_GB" from v$pdbs')
-                value = cursor.fetchone()
-                print(type(value))
             else:
                 raise e
-        value = round(cursor.fetchone()[0])
+    value = round(cursor.fetchone()[0])
     print(f'Total database size - {value}GB')
     return str(value) + 'G'
