@@ -51,7 +51,6 @@ if __name__ == '__main__':
                                'updater',
                           default=10, type=int)
     parser.add_argument('--connect_only', nargs='?', default=False, const=True)
-    parser.add_argument('--create_table', nargs='?', default=False, const=True)
     parser.add_argument('--enable_bct', nargs='?', default=False, const=True)
 
     result = parser.parse_args()
@@ -83,5 +82,5 @@ if __name__ == '__main__':
 
         pump_data(connection, result.db_name.upper(), result.total_size,
                   result.datafile_size, result.batch_size,
-                  create_table=result.create_table, max_threads=result.threads,
+                  max_threads=result.threads,
                   dest_recovery_size=result.dest_recovery_size)

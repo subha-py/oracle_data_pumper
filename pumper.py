@@ -27,6 +27,13 @@ import argparse
 
 
 
+def is_table_created(connection):
+    with connection.cursor() as cursor:
+        cursor.execute(f"""
+            SELECT table_name FROM user_tables WHERE table_name = 'TODOITEM'
+        """)
+        values = cursor.fetchall()
+        return True if len(values) > 0 else False
 
 def delete_todoitem_table(connection, tablename='todoitem'):
     with connection.cursor() as cursor:
@@ -207,8 +214,8 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
 
 
 def pump_data(connection, db_name, total_size, datafile_size, batch_size,
-              create_table=False, max_threads=128, dest_recovery_size='100G'):
-    if create_table:
+              max_threads=128, dest_recovery_size='100G'):
+    if not is_table_created(connection):
         create_todo_item_table(connection, db_name, datafile_size, dest_recovery_size)
     datafile_dir = get_datafile_dir(connection, db_name)
     target_number_of_datafile = human_read_to_byte(
@@ -285,5 +292,5 @@ if __name__ == '__main__':
                                    result.db_name.upper())
     pump_data(connection, result.db_name.upper(), result.total_size,
               result.datafile_size, result.batch_size,
-              create_table=result.create_table, max_threads=result.threads,
+              max_threads=result.threads,
               dest_recovery_size=result.dest_recovery_size)
