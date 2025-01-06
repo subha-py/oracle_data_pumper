@@ -214,8 +214,8 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
 
 
 def pump_data(connection, db_name, total_size, datafile_size, batch_size,
-              max_threads=128, dest_recovery_size='100G'):
-    if not is_table_created(connection):
+              create_table=False, max_threads=128, dest_recovery_size='100G'):
+    if not is_table_created(connection) or create_table:
         create_todo_item_table(connection, db_name, datafile_size, dest_recovery_size)
     datafile_dir = get_datafile_dir(connection, db_name)
     target_number_of_datafile = human_read_to_byte(
@@ -292,5 +292,5 @@ if __name__ == '__main__':
                                    result.db_name.upper())
     pump_data(connection, result.db_name.upper(), result.total_size,
               result.datafile_size, result.batch_size,
-              max_threads=result.threads,
+              create_table=result.create_table, max_threads=result.threads,
               dest_recovery_size=result.dest_recovery_size)

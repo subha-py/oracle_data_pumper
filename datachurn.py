@@ -52,6 +52,7 @@ if __name__ == '__main__':
                           default=10, type=int)
     parser.add_argument('--connect_only', nargs='?', default=False, const=True)
     parser.add_argument('--enable_bct', nargs='?', default=False, const=True)
+    parser.add_argument('--create_table', nargs='?', default=False, const=True)
 
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host,
@@ -82,5 +83,5 @@ if __name__ == '__main__':
 
         pump_data(connection, result.db_name.upper(), result.total_size,
                   result.datafile_size, result.batch_size,
-                  max_threads=result.threads,
+                  max_threads=result.threads, create_table=result.create_table,
                   dest_recovery_size=result.dest_recovery_size)
