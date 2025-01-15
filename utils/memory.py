@@ -23,8 +23,14 @@ def get_number_of_rows_from_file_size(size):
 def set_recovery_file_dest_size(connection, size):
     print('changing recovery file dest size')
     with connection.cursor() as cursor:
-        cursor.execute(
-            f"alter system set db_recovery_file_dest_size={size} scope=both")
+        try:
+            cursor.execute(
+                f"alter system set db_recovery_file_dest_size={size} scope=both")
+        except DatabaseError as e:
+            if 'ORA-65040' in str(e):
+                print('Cannot set db_recovery_file_dest_size in pdbs')
+            else:
+                raise e
     print(f'db_recovery_file_dest_size changed to {size}')
     return
 

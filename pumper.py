@@ -3,7 +3,7 @@ import string
 import sys
 import time
 import datetime
-
+import pathlib
 
 from oracledb.exceptions import DatabaseError
 import os
@@ -56,10 +56,15 @@ def delete_todoitem_table(connection, tablename='todoitem'):
 def get_datafile_dir(connection, db_name):
     print('Fetching datafile location')
     with connection.cursor() as cursor:
-        cursor.execute(
-            "select value from v$parameter where name = 'db_create_file_dest'")
-        result = cursor.fetchone()[0]
-    result = os.path.join(result, db_name, 'datafile')
+        if 'pdb' not in db_name.lower():
+            cursor.execute(
+                "select value from v$parameter where name = 'db_create_file_dest'")
+            result = cursor.fetchone()[0]
+            result = os.path.join(result, db_name, 'datafile')
+        else:
+            cursor.execute("select FILE_NAME from dba_data_files")
+            result = cursor.fetchone()[0]
+            result = str(pathlib.Path(result).parent)
     print(f'Got datafile location - {result}')
     return result
 
