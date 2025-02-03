@@ -32,7 +32,7 @@ if __name__ == '__main__':
                           default='cohesity', type=str)
     optional.add_argument('--total_size',
                           help='total size to be pumped (default:1G)',
-                          default='25G', type=str)
+                          default='50G', type=str)
     optional.add_argument('--datafile_size',
                           help='size of datafile (default:50G)',
                           default='1G',
