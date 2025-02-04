@@ -44,8 +44,8 @@ if __name__ == '__main__':
                           help='number of threads (default:128)',
                           default=32, type=int)
     optional.add_argument('--dest_recovery_size',
-                          help='dest_recovery_size (default: 100G)',
-                          default='500G', type=str)
+                          help='dest_recovery_size (default: 1T)',
+                          default='1T', type=str)
     optional.add_argument('--percentage',
                           help='percentage of db to be updated in case of '
                                'updater',
