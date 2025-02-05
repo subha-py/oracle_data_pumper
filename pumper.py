@@ -70,7 +70,10 @@ def get_datafile_dir(connection, db_name):
 
 
 def create_tablespace(connection, db_name, datafile_size):
-    tablespace_name = 'todoitemts'
+    ascii_letters = list(string.ascii_letters)
+    random_string = ''.join(
+        random.choices(ascii_letters, k=10))
+    tablespace_name = f'todoitemts_{random_string}'
     datafile_path = os.path.join(get_datafile_dir(connection, db_name),
                                  tablespace_name)
     cmd = (f"create tablespace {tablespace_name} \
