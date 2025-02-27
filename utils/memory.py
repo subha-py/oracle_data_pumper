@@ -16,6 +16,15 @@ def human_read_to_byte(size):
     # ** is the "exponent" operator - you can use it instead of math.pow()
     return num * factor
 
+def bytes_to_human_read(size_in_bytes):
+    size_name = ("B", "K", "M", "G", "T", "P", "E", "Z", "Y")
+    i = 0
+    factor = 1024
+    while size_in_bytes >= factor and i < len(size_name) - 1:
+        size_in_bytes /= factor
+        i += 1
+    return f"{int(size_in_bytes)}{size_name[i]}"
+
 def get_number_of_rows_from_file_size(size):
     # current todoitem schema having 11638091 rows amounts to 1G size
     return 11638091 * human_read_to_byte(size) // human_read_to_byte('1G')

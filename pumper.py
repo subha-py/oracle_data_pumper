@@ -14,7 +14,7 @@ from utils.memory import (
     human_read_to_byte,
     get_number_of_rows_from_file_size,
     set_recovery_file_dest_size,
-    get_databse_size
+    bytes_to_human_read
 )
 from utils.connection import connect_to_oracle
 
@@ -73,7 +73,7 @@ def create_tablespace(connection, db_name, datafile_size):
     ascii_letters = list(string.ascii_letters)
     random_string = ''.join(
         random.choices(ascii_letters, k=10))
-    tablespace_name = f'todoitemts_{random_string}'
+    tablespace_name = 'todoitemts'
     datafile_path = os.path.join(get_datafile_dir(connection, db_name),
                                  tablespace_name)
     cmd = (f"create tablespace {tablespace_name} \
@@ -114,11 +114,12 @@ def get_curr_number_of_datafile(connection):
 
 
 def process_batch(connection, datafile_dir, datafile_size, batch_size,
-                  batch_number, lock, rows=None, number_of_batches=None):
+                  batch_number, lock, rows=None, number_of_batches=None, random_flag=False):
     if not rows:
         rows = []
     toggle = 0
     ascii_letters = list(string.ascii_letters)
+
     if len(rows) < 1:
         for i in range(batch_size):
             task_number = random.randint(1, sys.maxsize)
@@ -126,13 +127,13 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
             row = (f'Task:{i + 1}', toggle, task_number, random_string)
             rows.append(row)
             toggle = int(not toggle)
+
     with connection.cursor() as cursor:
-        print('{}: inserting batch number - :{}/{}'.format(
-            datetime.datetime.now(), batch_number, number_of_batches))
+        print(f'{datetime.datetime.now()}: Inserting batch number - {batch_number}/{number_of_batches}')
+
         try:
             cursor.executemany(
-                "insert into todoitem (description, done, randomnumber,\
-                 randomstring) values(:1, :2, :3, :4)",
+                "insert into todoitem (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)",
                 rows)
 
         except DatabaseError as e:
@@ -142,18 +143,20 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
                     start = time.time()
                     lock.acquire()
                     try:
-                        print(
-                            f'acquired lock by batch number - :{batch_number}\
-                                                          {number_of_batches}')
-                        print(
-                            'failed to insert data due to lack of space \
-                            in tablespace')
-                        print(f'extending tablespace by {datafile_size}')
-                        # increase tablespace size by adding a new datafile
-                        random_string = ''.join(
-                            random.choices(ascii_letters, k=10))
-                        cmd = f"""ALTER TABLESPACE todoitemts ADD DATAFILE \
-                        '{datafile_dir}/todoitemts_{random_string}.dbf' \
+                        print(f'Acquired lock by batch number - {batch_number}/{number_of_batches}')
+                        print('Failed to insert data due to lack of space in tablespace')
+
+                        if random_flag:
+                            min_size = human_read_to_byte("50M")
+                            max_size = human_read_to_byte(datafile_size)
+                            random_bytes = random.randint(min_size, max_size)
+                            datafile_size = bytes_to_human_read(random_bytes)
+                            print(f'Picked random datafile_size = {datafile_size}')
+
+                        print(f'Extending tablespace by {datafile_size}')
+                        random_string = ''.join(random.choices(ascii_letters, k=10))
+                        cmd = f"""ALTER TABLESPACE todoitemts ADD DATAFILE 
+                        '{datafile_dir}/todoitemts_{random_string}.dbf' 
                         SIZE {datafile_size}"""
                         cursor.execute(cmd)
                         print('tablespace successfully increased')
@@ -188,8 +191,6 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
                             :{batch_number}/{number_of_batches}')
                         lock.release()
 
-
-                # if some other thread is acquiring lock
                 else:
                     while lock.locked():
                         sleep_time = random.randint(180, 300)
@@ -216,13 +217,14 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
                                           batch_number, lock, rows,
                                           number_of_batches)
                             return
-    print(f'committing batch number - :{batch_number}/{number_of_batches}')
+
     connection.commit()
+    print(f'Committed batch number - :{batch_number}/{number_of_batches}')
     return
 
 
 def pump_data(connection, db_name, total_size, datafile_size, batch_size,
-              create_table=False, max_threads=128, dest_recovery_size='100G'):
+              create_table=False, max_threads=128, dest_recovery_size='100G', random_flag=False):
     if not is_table_created(connection) or create_table:
         create_todo_item_table(connection, db_name, datafile_size, dest_recovery_size)
     datafile_dir = get_datafile_dir(connection, db_name)
@@ -239,7 +241,7 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size,
         for batch_number in range(1, number_of_batches + 1):
             arg = (
             connection, datafile_dir, datafile_size, batch_size, batch_number,
-            lock, None, number_of_batches)
+            lock, None, number_of_batches, random_flag)
             future_to_batch[
                 executor.submit(process_batch, *arg)] = batch_number
 
@@ -293,7 +295,8 @@ if __name__ == '__main__':
     optional.add_argument('--dest_recovery_size',
                           help='dest_recovery_size (default: 100G)',
                           default='500G', type=str)
-
+    optional.add_argument('--random_datafile_size', action='store_true', help='Enable randomization of datafile size')
+    optional.add_argument('--create_table', action='store_true', help='Recreate table before inserting data')
 
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host,
@@ -301,4 +304,4 @@ if __name__ == '__main__':
     pump_data(connection, result.db_name.upper(), result.total_size,
               result.datafile_size, result.batch_size,
               create_table=result.create_table, max_threads=result.threads,
-              dest_recovery_size=result.dest_recovery_size)
+              dest_recovery_size=result.dest_recovery_size, random_flag=result.random_datafile_size)
