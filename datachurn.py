@@ -32,7 +32,7 @@ if __name__ == '__main__':
                           default='cohesity', type=str)
     optional.add_argument('--total_size',
                           help='total size to be pumped (default:1G)',
-                          default='25G', type=str)
+                          default='10G', type=str)
     optional.add_argument('--datafile_size',
                           help='size of datafile (default:50G)',
                           default='1G',
@@ -42,7 +42,7 @@ if __name__ == '__main__':
                           default=100000, type=int)
     optional.add_argument('--threads',
                           help='number of threads (default:128)',
-                          default=32, type=int)
+                          default=16, type=int)
     optional.add_argument('--dest_recovery_size',
                           help='dest_recovery_size (default: 2T)',
                           default='2T', type=str)
