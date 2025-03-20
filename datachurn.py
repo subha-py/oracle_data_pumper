@@ -5,6 +5,7 @@ from utils.connection import connect_to_oracle
 from pumper import pump_data
 from utils.memory import human_read_to_byte, get_databse_size
 from updater import pump_updates
+from utils.check_pdb import check_pdb_status
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='A program to populate a db in oracle',
@@ -53,6 +54,7 @@ if __name__ == '__main__':
     parser.add_argument('--connect_only', nargs='?', default=False, const=True)
     parser.add_argument('--enable_bct', nargs='?', default=False, const=True)
     parser.add_argument('--create_table', nargs='?', default=False, const=True)
+    parser.add_argument('--check_pdb_status', nargs='?', default=False, const=True)
 
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host,
@@ -61,6 +63,9 @@ if __name__ == '__main__':
         sys.exit(0)
     if result.enable_bct:
         enable_bct(connection)
+        sys.exit(0)
+    if result.check_pdb_status:
+        check_pdb_status(connection)
         sys.exit(0)
     # if a database limit is more than 100G then buffer will be 10G else 2G
     if human_read_to_byte(result.limit) > human_read_to_byte('100G'):
