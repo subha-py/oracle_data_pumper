@@ -9,13 +9,25 @@ def check_pdb_status(connection, pdb_name):
             results = cursor.fetchall()
 
             if not results:
-                print("No PDBs found.")
-                return "NOT RW"
+                print(f"No PDB found with name: {pdb_name}")
+                return "NOT READ WRITE"
 
             pdb_name, open_mode = results[0]
             print(f"PDB: {pdb_name}, Open Mode: {open_mode}")
-            return "RW" if open_mode == "READ WRITE" else "NOT RW"
+
+            # More detailed status check
+            if open_mode == "READ WRITE":
+                return "IS READ WRITE"
+            elif open_mode == "MOUNTED":
+                print("PDB is mounted but not opened")
+                return "NOT READ WRITE"
+            elif open_mode == "READ ONLY":
+                print("PDB is in read-only mode")
+                return "NOT READ WRITE"
+            else:
+                print(f"PDB is in unexpected state: {open_mode}")
+                return "NOT READ WRITE"
 
         except DatabaseError as e:
             print(f"Error checking PDB status: {e}")
-            return "NOT RW"
+            return "NOT READ WRITE"

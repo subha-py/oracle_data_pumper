@@ -52,15 +52,15 @@ if __name__ == '__main__':
                           help='percentage of db to be updated in case of '
                                'updater',
                           default=10, type=int)
+    optional.add_argument('--connect_only', action='store_true', default=False)
+    optional.add_argument('--enable_bct', action='store_true', default=False)
+    optional.add_argument('--create_table', action='store_true', default=False)
     optional.add_argument('--check_pdb',
-                          help='PDB name to check for READ WRITE status',
-                          type=str)
-    optional.add_argument('--expected_value', type=str, help='Expected value for PDB status (e.g., RW)')
-    parser.add_argument('--connect_only', nargs='?', default=False, const=True)
-    parser.add_argument('--enable_bct', nargs='?', default=False, const=True)
-    parser.add_argument('--random_datafile_size', nargs='?', default=False,
-                    const=True, help='Enable randomization of datafile size')
-    parser.add_argument('--create_table', nargs='?', default=False, const=True)
+                      help='PDB name to check for READ WRITE status',
+                      type=str)
+    optional.add_argument('--expected_value',
+                      help='Expected value for PDB status check (RW for READ WRITE)',
+                      type=str)
 
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host,
@@ -74,8 +74,9 @@ if __name__ == '__main__':
         status = check_pdb_status(connection, result.check_pdb)
         print(f"PDB status is: {status}")
         if result.expected_value:
-            if status.strip().upper() != result.expected_value.strip().upper():
-                print(f"Expected status '{result.expected_value}' does not match actual status '{status}'")
+            expected = "IS READ WRITE" if result.expected_value.upper() == "RW" else "NOT READ WRITE"
+            if status != expected:
+                print(f"Status mismatch - Expected: {expected}, Got: {status}")
                 sys.exit(1)
         sys.exit(0)
     # if a database limit is more than 100G then buffer will be 10G else 2G
@@ -100,5 +101,4 @@ if __name__ == '__main__':
         pump_data(connection, result.db_name.upper(), result.total_size,
                   result.datafile_size, result.batch_size,
                   max_threads=result.threads, create_table=result.create_table,
-                  dest_recovery_size=result.dest_recovery_size,
-                  random_flag=result.random_datafile_size)
+                  dest_recovery_size=result.dest_recovery_size)
