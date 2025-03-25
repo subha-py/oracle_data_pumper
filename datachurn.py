@@ -1,11 +1,12 @@
 import argparse
 import sys
 from utils.bct import enable_bct
+from utils.check_pdb import check_pdb_status
 from utils.connection import connect_to_oracle
 from pumper import pump_data
 from utils.memory import human_read_to_byte, get_databse_size
 from updater import pump_updates
-from utils.check_pdb import check_pdb_status
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='A program to populate a db in oracle',
@@ -33,7 +34,7 @@ if __name__ == '__main__':
                           default='cohesity', type=str)
     optional.add_argument('--total_size',
                           help='total size to be pumped (default:1G)',
-                          default='10G', type=str)
+                          default='25G', type=str)
     optional.add_argument('--datafile_size',
                           help='size of datafile (default:50G)',
                           default='1G',
@@ -43,7 +44,7 @@ if __name__ == '__main__':
                           default=100000, type=int)
     optional.add_argument('--threads',
                           help='number of threads (default:128)',
-                          default=16, type=int)
+                          default=32, type=int)
     optional.add_argument('--dest_recovery_size',
                           help='dest_recovery_size (default: 2T)',
                           default='2T', type=str)
@@ -51,12 +52,14 @@ if __name__ == '__main__':
                           help='percentage of db to be updated in case of '
                                'updater',
                           default=10, type=int)
+    optional.add_argument('--check_pdb',
+                          help='PDB name to check for READ WRITE status',
+                          type=str)
     parser.add_argument('--connect_only', nargs='?', default=False, const=True)
     parser.add_argument('--enable_bct', nargs='?', default=False, const=True)
     parser.add_argument('--random_datafile_size', nargs='?', default=False,
                     const=True, help='Enable randomization of datafile size')
     parser.add_argument('--create_table', nargs='?', default=False, const=True)
-    parser.add_argument('--check_pdb_status', nargs='?', default=False, const=True)
 
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host,
@@ -66,8 +69,9 @@ if __name__ == '__main__':
     if result.enable_bct:
         enable_bct(connection)
         sys.exit(0)
-    if result.check_pdb_status:
-        check_pdb_status(connection)
+    if result.check_pdb:
+        status = check_pdb_status(connection, result.check_pdb)
+        print(f"PDB status is: {status}")
         sys.exit(0)
     # if a database limit is more than 100G then buffer will be 10G else 2G
     if human_read_to_byte(result.limit) > human_read_to_byte('100G'):
