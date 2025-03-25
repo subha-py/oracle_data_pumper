@@ -55,6 +55,7 @@ if __name__ == '__main__':
     optional.add_argument('--check_pdb',
                           help='PDB name to check for READ WRITE status',
                           type=str)
+    optional.add_argument('--expected_value', type=str, help='Expected value for PDB status (e.g., RW)')
     parser.add_argument('--connect_only', nargs='?', default=False, const=True)
     parser.add_argument('--enable_bct', nargs='?', default=False, const=True)
     parser.add_argument('--random_datafile_size', nargs='?', default=False,
@@ -72,6 +73,10 @@ if __name__ == '__main__':
     if result.check_pdb:
         status = check_pdb_status(connection, result.check_pdb)
         print(f"PDB status is: {status}")
+        if result.expected_value:
+            if status.strip().upper() != result.expected_value.strip().upper():
+                print(f"Expected status '{result.expected_value}' does not match actual status '{status}'")
+                sys.exit(1)
         sys.exit(0)
     # if a database limit is more than 100G then buffer will be 10G else 2G
     if human_read_to_byte(result.limit) > human_read_to_byte('100G'):
