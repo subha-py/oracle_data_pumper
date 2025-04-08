@@ -69,14 +69,20 @@ def get_datafile_dir(connection, db_name):
     return result
 
 
-def create_tablespace(connection, db_name, datafile_size):
+def create_tablespace(connection, db_name, datafile_size, autoextend):
     ascii_letters = list(string.ascii_letters)
     random_string = ''.join(
         random.choices(ascii_letters, k=10))
     tablespace_name = 'todoitemts'
     datafile_path = os.path.join(get_datafile_dir(connection, db_name),
                                  tablespace_name)
-    cmd = (f"create tablespace {tablespace_name} \
+
+    if autoextend:
+        cmd = (f"""create tablespace {tablespace_name} \
+            datafile '{datafile_path}.dbf' size {datafile_size} AUTOEXTEND 
+            ON NEXT {datafile_size} EXTENT MANAGEMENT LOCAL SEGMENT SPACE MANAGEMENT AUTO""")
+    else:
+        cmd = (f"create tablespace {tablespace_name} \
         datafile '{datafile_path}.dbf' size {datafile_size}")
     print(f'creating tablespace with name - {tablespace_name}')
     with connection.cursor() as cursor:
@@ -85,10 +91,12 @@ def create_tablespace(connection, db_name, datafile_size):
     return tablespace_name
 
 
-def create_todo_item_table(connection, db_name, datafile_size, dest_recovery_size):
+def create_todo_item_table(connection, db_name, datafile_size,
+                           dest_recovery_size, autoextend):
     set_recovery_file_dest_size(connection, dest_recovery_size)
     delete_todoitem_table(connection)
-    tablespace_name = create_tablespace(connection, db_name, datafile_size)
+    tablespace_name = create_tablespace(connection, db_name, datafile_size,
+                                        autoextend)
     print('creating table todoitem')
     with connection.cursor() as cursor:
         cursor.execute(f"""
@@ -224,9 +232,11 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
 
 
 def pump_data(connection, db_name, total_size, datafile_size, batch_size,
-              create_table=False, max_threads=128, dest_recovery_size='100G', random_flag=False):
+              create_table=False, max_threads=128,
+              dest_recovery_size='100G', random_flag=False, autoextend=False):
     if not is_table_created(connection) or create_table:
-        create_todo_item_table(connection, db_name, datafile_size, dest_recovery_size)
+        create_todo_item_table(connection, db_name, datafile_size,
+                               dest_recovery_size, autoextend)
     datafile_dir = get_datafile_dir(connection, db_name)
     target_number_of_datafile = human_read_to_byte(
         total_size) // human_read_to_byte(datafile_size)
@@ -258,50 +268,9 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size,
 
     return result
 
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='A program to populate a db in oracle',
-        usage='python3 pumper.py --host 10.14.69.121 --db_name prodsb21\
-                --user sys --password cohesity --total_size 1G \
-                --datafile_size 200M --batch_size 200000 ')
-    parser._action_groups.pop()
-    required = parser.add_argument_group('required arguments')
-    optional = parser.add_argument_group('optional arguments')
-
-    required.add_argument('--host', help='ip/hostname of the db',
-                          type=str, required=True)
-    required.add_argument('--db_name', help='name of database',
-                          type=str, required=True)
-    optional.add_argument('--user',
-                          help='username of db (default:sys)', default='sys',
-                          type=str)
-    optional.add_argument('--password',
-                          help='password of db (default:cohesity)',
-                          default='cohesity', type=str)
-    optional.add_argument('--total_size',
-                          help='total size to be pumped (default:1G)',
-                          default='1G', type=str)
-    optional.add_argument('--datafile_size',
-                          help='size of datafile (default:200M)',
-                          default='200M',
-                          type=str)
-    optional.add_argument('--batch_size',
-                          help='number of rows in each batch (default:200000)',
-                          default=100000, type=int)
-    optional.add_argument('--threads',
-                          help='number of threads (default:128)',
-                          default=128, type=int)
-    optional.add_argument('--dest_recovery_size',
-                          help='dest_recovery_size (default: 100G)',
-                          default='500G', type=str)
-    optional.add_argument('--random_datafile_size', action='store_true', help='Enable randomization of datafile size')
-    optional.add_argument('--create_table', action='store_true', help='Recreate table before inserting data')
-
-    result = parser.parse_args()
-    connection = connect_to_oracle(result.user, result.password, result.host,
-                                   result.db_name.upper())
-    pump_data(connection, result.db_name.upper(), result.total_size,
-              result.datafile_size, result.batch_size,
-              create_table=result.create_table, max_threads=result.threads,
-              dest_recovery_size=result.dest_recovery_size, random_flag=result.random_datafile_size)
+    connection = connect_to_oracle('sys', 'cohesity', '10.3.63.235',
+                                   'FIDB0',)
+    pump_data(connection, 'FIDB0', '1G', '100M', 100000, create_table=True,
+              max_threads=128, dest_recovery_size='1T', random_flag=False,
+              autoextend=True)
