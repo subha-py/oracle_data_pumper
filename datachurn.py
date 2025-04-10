@@ -1,7 +1,7 @@
 import argparse
 import sys
 from utils.bct import enable_bct
-from utils.check_pdb import check_pdb_status
+import utils.pdb
 from utils.connection import connect_to_oracle
 from pumper import pump_data
 from utils.memory import human_read_to_byte, get_databse_size
@@ -52,6 +52,7 @@ if __name__ == '__main__':
                           help='percentage of db to be updated in case of '
                                'updater',
                           default=10, type=int)
+    optional.add_argument('--random_datafile_size', action='store_true', help='Enable randomization of datafile size')
     optional.add_argument('--connect_only', action='store_true', default=False)
     optional.add_argument('--enable_bct', action='store_true', default=False)
     optional.add_argument('--create_table', action='store_true', default=False)
@@ -61,7 +62,6 @@ if __name__ == '__main__':
     optional.add_argument('--expected_value',
                       help='Expected value for PDB status check (RW for READ WRITE)',
                       type=str)
-    optional.add_argument('--autoextend',action='store_true', default=False)
 
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host,
@@ -72,7 +72,7 @@ if __name__ == '__main__':
         enable_bct(connection)
         sys.exit(0)
     if result.check_pdb:
-        status = check_pdb_status(connection, result.check_pdb)
+        status = utils.pdb.check_pdb_status(connection, result.check_pdb)
         print(f"PDB status is: {status}")
         if result.expected_value:
             expected = "IS READ WRITE" if result.expected_value.upper() == "RW" else "NOT READ WRITE"
@@ -103,4 +103,4 @@ if __name__ == '__main__':
                   result.datafile_size, result.batch_size,
                   max_threads=result.threads, create_table=result.create_table,
                   dest_recovery_size=result.dest_recovery_size,
-                  autoextend=result.autoextend)
+                  random_flag=result.random_datafile_size)
