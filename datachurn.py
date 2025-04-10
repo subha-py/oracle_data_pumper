@@ -1,7 +1,6 @@
 import argparse
 import sys
 from utils.bct import enable_bct
-import utils.pdb
 from utils.connection import connect_to_oracle
 from pumper import pump_data
 from utils.memory import human_read_to_byte, get_databse_size
@@ -56,9 +55,6 @@ if __name__ == '__main__':
     optional.add_argument('--connect_only', action='store_true', default=False)
     optional.add_argument('--enable_bct', action='store_true', default=False)
     optional.add_argument('--create_table', action='store_true', default=False)
-    optional.add_argument('--check_pdb',
-                      help='PDB name to check for READ WRITE status',
-                      type=str)
     optional.add_argument('--expected_value',
                       help='Expected value for PDB status check (RW for READ WRITE)',
                       type=str)
@@ -70,15 +66,6 @@ if __name__ == '__main__':
         sys.exit(0)
     if result.enable_bct:
         enable_bct(connection)
-        sys.exit(0)
-    if result.check_pdb:
-        status = utils.pdb.check_pdb_status(connection, result.check_pdb)
-        print(f"PDB status is: {status}")
-        if result.expected_value:
-            expected = "IS READ WRITE" if result.expected_value.upper() == "RW" else "NOT READ WRITE"
-            if status != expected:
-                print(f"Status mismatch - Expected: {expected}, Got: {status}")
-                sys.exit(1)
         sys.exit(0)
     # if a database limit is more than 100G then buffer will be 10G else 2G
     if human_read_to_byte(result.limit) > human_read_to_byte('100G'):
