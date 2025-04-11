@@ -58,6 +58,7 @@ if __name__ == '__main__':
     optional.add_argument('--expected_value',
                       help='Expected value for PDB status check (RW for READ WRITE)',
                       type=str)
+    optional.add_argument('--autoextend',action='store_true', default=False)
 
     result = parser.parse_args()
     connection = connect_to_oracle(result.user, result.password, result.host,
@@ -90,4 +91,4 @@ if __name__ == '__main__':
                   result.datafile_size, result.batch_size,
                   max_threads=result.threads, create_table=result.create_table,
                   dest_recovery_size=result.dest_recovery_size,
-                  random_flag=result.random_datafile_size)
+                  random_flag=result.random_datafile_size, autoextend=result.autoextend)
