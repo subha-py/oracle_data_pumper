@@ -55,6 +55,7 @@ if __name__ == '__main__':
     optional.add_argument('--connect_only', action='store_true', default=False)
     optional.add_argument('--enable_bct', action='store_true', default=False)
     optional.add_argument('--create_table', action='store_true', default=False)
+    optional.add_argument('--multi_table', action='store_true', default=False)
     optional.add_argument('--expected_value',
                       help='Expected value for PDB status check (RW for READ WRITE)',
                       type=str)
@@ -91,4 +92,4 @@ if __name__ == '__main__':
                   result.datafile_size, result.batch_size,
                   max_threads=result.threads, create_table=result.create_table,
                   dest_recovery_size=result.dest_recovery_size,
-                  random_flag=result.random_datafile_size, autoextend=result.autoextend)
+                  random_flag=result.random_datafile_size, autoextend=result.autoextend, multi_table=result.multi_table)

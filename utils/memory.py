@@ -1,4 +1,5 @@
 from oracledb.exceptions import DatabaseError
+from utils.connection import connect_to_oracle
 def human_read_to_byte(size):
     # if no space in between retry
     size_name = ("B", "K", "M", "G", "T", "P", "E", "Z", "Y")
@@ -58,3 +59,8 @@ def get_databse_size(connection):
         value = round(cursor.fetchone()[0])
     print(f'Total database size - {value}GB')
     return str(value) + 'G'
+if __name__ == '__main__':
+    connect=connect_to_oracle(
+        "oracle","cohesity","10.3.63", "fitdb"
+    )
+    print(get_databse_size(connect))
