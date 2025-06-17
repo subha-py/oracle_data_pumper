@@ -59,8 +59,17 @@ def get_databse_size(connection):
         value = round(cursor.fetchone()[0])
     print(f'Total database size - {value}GB')
     return str(value) + 'G'
+def get_number_of_rows(connection):
+    print('querying table row count')
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute("SELECT COUNT(*) FROM todoitem")
+        except DatabaseError as e:
+            pass
+        value = cursor.fetchone()[0]
+    return value
 if __name__ == '__main__':
-    connect=connect_to_oracle(
-        "oracle","cohesity","10.3.63", "fitdb"
-    )
-    print(get_databse_size(connect))
+    connect = connect_to_oracle('sys', 'cohesity', '10.14.24.28',
+                                   'prod1',)
+    result = get_number_of_rows(connect)
+    print(result)
