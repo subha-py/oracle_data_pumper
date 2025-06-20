@@ -5,10 +5,10 @@ import time
 import logging
 
 # --- Configuration ---
-# output = '/home/oracle/master_16_05'
-# installer = f'https://artifactory.eng.cohesity.com/artifactory/cohesity-builds-smoke/master/20250615-200911/qa_minimal/internal_only_rpms_package/cohesity_agent_0.0.0-master_linux_x64_installer -O {output}'
-output = '/home/oracle/7.1.2_u4_installer'
-installer = f'https://sv4-pluto.eng.cohesity.com/bugs/sbera_backups/cohesity_agent_7.1.2_u4_linux_x64_installer -O {output}'
+output = '/home/oracle/master_16_05'
+installer = f'https://artifactory.eng.cohesity.com/artifactory/cohesity-builds-smoke/master/20250615-200911/qa_minimal/internal_only_rpms_package/cohesity_agent_0.0.0-master_linux_x64_installer -O {output}'
+# output = '/home/oracle/7.1.2_u4_installer'
+# installer = f'https://sv4-pluto.eng.cohesity.com/bugs/sbera_backups/cohesity_agent_7.1.2_u4_linux_x64_installer -O {output}'
 ST_05_HOSTS = [
     "10.14.69.210",
     "10.14.69.211", "10.3.63.147", "10.14.69.123", "10.14.69.212",
@@ -24,8 +24,15 @@ ST_AUTO_HOSTS = [
     '10.3.63.213','10.14.69.164','10.14.70.90','10.14.69.180','10.3.63.225',
     '10.3.63.226','10.3.63.227'
 ]
-test_hosts = ['10.3.63.220']
-HOSTS = test_hosts
+
+ST_MASTER_HOSTS = [
+    '10.3.63.220', '10.14.69.215', '10.14.69.187', '10.14.69.216', '10.14.70.149',
+    '10.14.69.239', '10.14.69.240', '10.14.69.241', '10.3.63.185', '10.14.69.186',
+    '10.14.69.139', '10.14.69.187', '10.14.69.186', '10.3.63.228', '10.3.63.229',
+    '10.3.63.230', '10.3.63.139', '10.14.70.136', '10.14.70.134', '10.14.70.159',
+    '10.14.70.146',
+]
+HOSTS = ST_AUTO_HOSTS
 
 USERNAME = 'root'  # SSH username
 
