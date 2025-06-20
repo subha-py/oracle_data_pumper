@@ -71,5 +71,5 @@ def get_number_of_rows(connection):
 if __name__ == '__main__':
     connect = connect_to_oracle('sys', 'cohesity', '10.14.24.28',
                                    'prod1',)
-    result = get_number_of_rows(connect)
-    print(result)
+    result = get_databse_size(connect)
+    print(f'size -> {result}')
