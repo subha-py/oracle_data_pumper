@@ -47,14 +47,13 @@ def process_batch(connection, datafile_dir, datafile_size, batch_size,
             toggle = int(not toggle)
 
     with connection.cursor() as cursor:
-        print(f'{datetime.datetime.now()}: Inserting batch number - {batch_number}/{number_of_batches}')
         try:
             if multi_table:
                 table_entry = random.choice(tables)
                 table = table_entry[0] if isinstance(table_entry, (list, tuple)) else str(table_entry)
             else:
                 table= "todoitem"
-            print(f"inserting into {table} {batch_number}")
+            print(f"{datetime.datetime.now()}: inserting into {table}: batch_number: {batch_number}/{number_of_batches}")
             cursor.executemany(
                 f"insert into {table} (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)",
                 rows)
@@ -194,21 +193,21 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size,
     return result
 
 if __name__ == '__main__':
-    connection = connect_to_oracle('sys', 'cohesity', '10.14.69.210',
-                                   'test1000db')
+    connection = connect_to_oracle('sys', 'cohesity', '10.14.69.168',
+                                   'orcl1')
     # for i in range(1,1001):
     #     print(f"deleting todoitem{i}")
     # delete_todoitem_table(connection, f'TODOITEM')
     pump_data(
         connection=connection,
-        db_name='TEST1000DB',
-        total_size='100G',
+        db_name='orcl1',
+        total_size='500G',
         datafile_size='100M',
         batch_size=10000,
-        create_table=True,
+        create_table=False,
         max_threads=128,
         dest_recovery_size='1T',
         random_flag=False,
-        autoextend=False,
-        multi_table=True
+        autoextend=True,
+        # multi_table=True
     )
