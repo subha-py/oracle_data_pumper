@@ -5,7 +5,7 @@ import sys
 
 # Get the directory where the script is located
 def set_logger(log_file_name):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    script_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
     log_filename = log_file_name
     log_filepath = os.path.join(script_dir, log_filename)
     if os.path.exists(log_filepath):

@@ -5,3 +5,4 @@ def startup_activities(logger):
 
 if __name__ == '__main__':
     logger=set_logger('pumper_startup_logger.log')
+    startup_activities(logger)
