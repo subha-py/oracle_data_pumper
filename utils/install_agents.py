@@ -1,9 +1,6 @@
 import paramiko
-import os
-import sys
 import time
-import logging
-
+from utils.log import set_logger
 # --- Configuration ---
 output = '/home/oracle/master_16_05'
 installer = f'https://artifactory.eng.cohesity.com/artifactory/cohesity-builds-smoke/master/20250615-200911/qa_minimal/internal_only_rpms_package/cohesity_agent_0.0.0-master_linux_x64_installer -O {output}'
@@ -47,47 +44,8 @@ COMMANDS = [
     f'sudo {output} -- --install -S oracle -G oinstall -c 0 -I /home/oracle -y'
 ]
 
-# --- SSH Client Setup ---
-ssh_client = paramiko.SSHClient()
-# This policy is insecure for production. For production, use AutoAddPolicy
-# only after verifying the host key, or use SSHClient().load_system_host_keys().
-ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # Auto accept host keys
-
-
-# --- Function to execute commands on a single host ---
-# --- Configuration ---
-# Get the directory where the script is located
-script_dir = os.path.dirname(os.path.abspath(__file__))
-log_filename = "my_script_output.log"
-log_filepath = os.path.join(script_dir, log_filename)
-os.remove(log_filepath)
-# Configure the logger
-# Create a logger object
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO) # Set the minimum level for messages to be processed (e.g., INFO, DEBUG, WARNING, ERROR, CRITICAL)
-
-# Create a file handler which logs messages to a file
-# 'a' mode means append, so new runs append to the same file
-file_handler = logging.FileHandler(log_filepath, mode='a')
-file_handler.setLevel(logging.INFO) # Level for this handler
-
-# Create a formatter and add it to the handler
-# You can customize the log format.
-# %(asctime)s: Timestamp
-# %(levelname)s: Log level (INFO, DEBUG, etc.)
-# %(message)s: The actual log message
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-
-# Add the file handler to the logger
-logger.addHandler(file_handler)
-
-# Optional: Add a console handler to also logger.info to screen (like logger.info statements)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO) # Level for this handler
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
-def execute_commands_on_host(hostname, username, password, commands, key=None):
+COMMANDS=['echo "hello"']
+def execute_commands_on_host(hostname, username, password, commands, logger, ssh_client, key=None):
     logger.info(f"\n--- Connecting to {hostname} ---")
     try:
         if key:
@@ -132,7 +90,10 @@ def execute_commands_on_host(hostname, username, password, commands, key=None):
 
 # --- Main execution ---
 if __name__ == "__main__":
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    logger = set_logger('my_script_output.log')
     for host in HOSTS:
         # Pass PASSWORD or KEY based on which method you choose above
         execute_commands_on_host(host, USERNAME, PASSWORD,
-            COMMANDS)  # For password authentication  # execute_commands_on_host(host, USERNAME, None, COMMANDS, key=KEY) # For key authentication
+            COMMANDS, logger, ssh_client)  # For password authentication  # execute_commands_on_host(host, USERNAME, None, COMMANDS, key=KEY) # For key authentication
