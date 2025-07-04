@@ -44,6 +44,19 @@ def set_recovery_file_dest_size(connection, size):
     print(f'db_recovery_file_dest_size changed to {size}')
     return
 
+def get_recovery_file_dest(connection):
+    value = None
+    print('changing recovery file dest size')
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute("SELECT name FROM V$RECOVERY_FILE_DEST")
+        except DatabaseError as e:
+            print('cannot get recovery file destinatoion')
+            return
+        value = cursor.fetchone()[0]
+    print(f'recovery file dest size - {value}')
+    return value
+
 def get_databse_size(connection):
     print('querying database size')
     with connection.cursor() as cursor:
