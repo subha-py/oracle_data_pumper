@@ -29,8 +29,6 @@ def pull_latest_code(logger, repo_path="."):
         result = subprocess.run(
             ['git', 'pull', '-r'],
             cwd=repo_path,
-            check=True,
-            text=True
         )
 
         logger.info("Git pull successful!")
