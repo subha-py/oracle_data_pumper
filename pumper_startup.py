@@ -30,7 +30,6 @@ def pull_latest_code(logger, repo_path="."):
             ['git', 'pull', '-r'],
             cwd=repo_path,
             check=True,
-            capture_output=True,
             text=True
         )
 
