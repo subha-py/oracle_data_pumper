@@ -17,19 +17,21 @@ ST_05_HOSTS = [
 ST_AUTO_HOSTS = [
     '10.14.69.161','10.3.63.138','10.14.70.158','10.14.70.133','10.14.70.157',
     '10.14.70.145','10.14.69.163','10.14.70.90','10.14.69.124','10.3.63.221',
-    '10.14.69.170','10.14.69.171','10.14.69.172','10.3.63.224','10.14.69.121',
+    # '10.14.69.170','10.14.69.171','10.14.69.172', # -------> rac setups
+    '10.3.63.224','10.14.69.121',
     '10.3.63.213','10.14.69.164','10.14.70.90','10.14.69.180','10.3.63.225',
     '10.3.63.226','10.3.63.227'
 ]
 
 ST_MASTER_HOSTS = [
     '10.3.63.220', '10.14.69.215', '10.14.69.187', '10.14.69.216', '10.14.70.149',
-    '10.14.69.239', '10.14.69.240', '10.14.69.241', '10.3.63.185', '10.14.69.186',
+    # '10.14.69.239', '10.14.69.240', '10.14.69.241', # ---> rac setups
+    '10.3.63.185', '10.14.69.186',
     '10.14.69.139', '10.14.69.187', '10.14.69.186', '10.3.63.228', '10.3.63.229',
     '10.3.63.230', '10.3.63.139', '10.14.70.136', '10.14.70.134', '10.14.70.159',
     '10.14.70.146',
 ]
-HOSTS = ST_AUTO_HOSTS
+HOSTS = ST_AUTO_HOSTS + ST_05_HOSTS + ST_MASTER_HOSTS
 
 USERNAME = 'root'  # SSH username
 
@@ -37,14 +39,21 @@ USERNAME = 'root'  # SSH username
 # 1. Directly in script (NOT RECOMMENDED for production)
 PASSWORD = 'root'
 
-COMMANDS = [
-    f'wget {installer}',
-    f'chmod +x {output}',
-    f'sudo {output} -- --full-uninstall -y',
-    f'sudo {output} -- --install -S oracle -G oinstall -c 0 -I /home/oracle -y'
-]
+# COMMANDS = [
+#     f'wget {installer}',
+#     f'chmod +x {output}',
+#     f'sudo {output} -- --full-uninstall -y',
+#     f'sudo {output} -- --install -S oracle -G oinstall -c 0 -I /home/oracle -y'
+# ]
 
-COMMANDS=['echo "hello"']
+COMMANDS=[
+    'wget https://sv4-pluto.eng.cohesity.com/bugs/sbera_backups/services/oracle-listener.service -O /etc/systemd/system/oracle-listener.service',
+    'wget https://sv4-pluto.eng.cohesity.com/bugs/sbera_backups/services/oracle-database.service -O /etc/systemd/system/oracle-database.service',
+    'sudo systemctl daemon-reexec','sudo systemctl daemon-reload',
+    'sudo systemctl enable oracle-listener.service', 'sudo systemctl start oracle-listener.service',
+    'sudo systemctl enable oracle-database.service', 'sudo systemctl start oracle-database.service',
+    'sudo systemctl status oracle-listener.service', 'sudo systemctl status oracle-database.service'
+]
 def execute_commands_on_host(hostname, username, password, commands, logger, ssh_client, key=None):
     logger.info(f"\n--- Connecting to {hostname} ---")
     try:

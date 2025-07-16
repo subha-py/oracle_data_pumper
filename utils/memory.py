@@ -1,5 +1,8 @@
 from oracledb.exceptions import DatabaseError
 from utils.connection import connect_to_oracle
+from utils.ssh import execute_commands_on_host
+import logging
+import os
 def human_read_to_byte(size):
     # if no space in between retry
     size_name = ("B", "K", "M", "G", "T", "P", "E", "Z", "Y")
@@ -81,8 +84,79 @@ def get_number_of_rows(connection):
             pass
         value = cursor.fetchone()[0]
     return value
+
+def parse_size_to_gb(size_str):
+    """
+    Converts a size string (e.g. '512M', '1.5G', '2T') to GB as integer.
+    """
+    size_str = size_str.strip().upper()
+    if size_str.endswith('G'):
+        return int(float(size_str[:-1]))
+    elif size_str.endswith('M'):
+        return int(float(size_str[:-1]) / 1024)
+    elif size_str.endswith('T'):
+        return int(float(size_str[:-1]) * 1024)
+    elif size_str.endswith('K'):
+        return int(float(size_str[:-1]) / (1024 * 1024))
+    else:
+        try:
+            return int(float(size_str))  # assume GB if no unit
+        except:
+            return 0
+
+def get_remote_disk_usage_multiple_in_gbs(ip, mount_points=None):
+    results = {}
+    if mount_points is None:
+        mount_points = ['/u02', '/']
+    try:
+        # Run df command
+        commands = ["df -h --output=avail,target"]
+        stdout, stderr = execute_commands_on_host(ip, commands)
+        df_output = stdout.splitlines()
+
+        if len(df_output) < 2:
+            raise Exception("No disk data received from remote host.")
+
+        # Parse df output
+        disk_data = {}
+        for line in df_output[1:]:  # Skip header
+            parts = line.strip().split()
+            if len(parts) == 2:
+                avail, target = parts
+                disk_data[target] = parse_size_to_gb(avail)
+
+        # Fill results
+        for mount in mount_points:
+            results[mount] = disk_data.get(mount, 0)
+
+    except Exception as e:
+        return {mp: -1 for mp in mount_points}
+
+    return results
+
+def check_available_space(ips):
+    logger = logging.getLogger(os.environ.get("log_file_name"))
+    good_vms = []
+    bad_vms = []
+    mount_points = ['/u02', '/']
+    for ip in ips:
+        check = True
+        result = get_remote_disk_usage_multiple_in_gbs(ip, mount_points)
+        logger.info(f'current space usaage of {mount_points} -> {result}')
+        if result['/u02'] < 50:
+            check = False
+        elif result['/'] < 2:
+            check = False
+        if check is True:
+            good_vms.append(ip)
+        else:
+            bad_vms.append(ip)
+    logger.info(f'vms which failed the space check - {bad_vms}')
+    logger.info(f'vms which passed the space check - {good_vms}')
+    return good_vms
+
+
+
 if __name__ == '__main__':
-    connect = connect_to_oracle('sys', 'cohesity', '10.14.24.28',
-                                   'prod1',)
-    result = get_databse_size(connect)
-    print(f'size -> {result}')
+    result = get_remote_disk_usage_multiple_in_gbs('10.14.69.139')
+    print(result)

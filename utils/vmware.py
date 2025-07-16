@@ -85,10 +85,15 @@ def reboot_vm_by_ip(vm_ip):
 def reboot_vms_by_ip_list(ip_list):
     logger = logging.getLogger(os.environ.get("log_file_name"))
     faulty_vm = []
+    good_vms = []
     for ip in ip_list:
         result = reboot_vm_by_ip(ip)
         if not result:
             faulty_vm.append(ip)
-    logger.info(f'Could not find vms with ip - {faulty_vm}')
+        else:
+            good_vms.append(ip)
+    logger.info(f'Could not find vms with ip - {faulty_vm}\n')
+    logger.info(f'Vms rebooted successfully - {good_vms}')
+    return good_vms
 if __name__ == '__main__':
     reboot_vms_by_ip_list(['10.131.37.91',])

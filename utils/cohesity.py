@@ -2,6 +2,7 @@ import requests
 import random
 import os
 import logging
+from collections import defaultdict
 def get_node_ips(cluster_ip, username="admin", password="Syst7mt7st", domain="local", access_token=None):
     logger = logging.getLogger(os.environ.get("log_file_name"))
     headers = {'Content-Type': "application/json", 'accept': "application/json"}
