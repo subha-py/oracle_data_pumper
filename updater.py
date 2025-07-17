@@ -91,6 +91,12 @@ def pump_updates(connection, batch_size, max_threads=128, percentage=10):
         except Exception as exc:
             print("%r generated an exception: %s" % (batch_number, exc))
             # todo: handle here sequentially for error batches
+def pump_updates_sequential(connection, batch_size, percentage):
+    total_rows = get_row_count(connection) * percentage // 100
+    number_of_batches = total_rows // batch_size
+    for batch_number in range(1, number_of_batches + 1):
+        process_batch(connection, batch_size, batch_number, None,
+            number_of_batches, batch_number * number_of_batches - 1)
 
 
 if __name__ == '__main__':

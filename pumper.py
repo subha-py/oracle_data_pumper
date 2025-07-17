@@ -191,6 +191,23 @@ def pump_data(connection, db_name, total_size, datafile_size, batch_size,
         except Exception as exc:
             print(f"Batch {batch_number} failed: {exc}")
     return result
+def pump_data_sequential(connection, db_name, total_size, datafile_size, batch_size,
+              create_table=False,
+              dest_recovery_size='100G', random_flag=False, autoextend=False,
+              multi_table=False):
+    datafile_dir = get_datafile_dir(connection, db_name)
+    total_rows_required = get_number_of_rows_from_file_size(total_size)
+    number_of_batches = total_rows_required // batch_size
+
+    lock = Lock()
+    future_to_batch = {}
+
+    # Create tables and tablespaces
+    create_todo_item_table(connection, db_name, datafile_size, dest_recovery_size, autoextend, create_table, multi_table)
+
+    tables = list_all_todoitem_tables(connection, multi_table)
+    for batch_number in range(1, number_of_batches + 1):
+        process_batch(connection, datafile_dir, datafile_size, batch_size, batch_number, lock, tables, multi_table, number_of_batches=number_of_batches, random_flag=random_flag)
 
 if __name__ == '__main__':
     connection = connect_to_oracle('sys', 'cohesity', '10.14.69.168',

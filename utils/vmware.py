@@ -44,23 +44,8 @@ def reboot_vm(vm, si):
     time.sleep(120)
 
 
-def ping_ip(ip):
-    try:
-        subprocess.check_output(['ping', '-c', '1', '-W', '1', ip], stderr=subprocess.DEVNULL)
-        return True
-    except subprocess.CalledProcessError:
-        return False
 
-def wait_for_ping(ip, timeout):
-    logger = logging.getLogger(os.environ.get("log_file_name"))
-    logger.info(f"Pinging {ip} to check availability...")
-    start = time.time()
-    while time.time() - start < timeout:
-        if ping_ip(ip):
-            logger.info(f"{ip} is reachable.")
-            return True
-        time.sleep(5)
-    raise TimeoutError(f"Timed out waiting for {ip} to respond to ping.")
+
 
 def reboot_vm_by_ip(vm_ip):
     logger = logging.getLogger(os.environ.get("log_file_name"))
@@ -78,7 +63,7 @@ def reboot_vm_by_ip(vm_ip):
         Disconnect(si)
         return True
     else:
-        logger.info(f"VM with IP {vm_ip} not found.")
+        logger.warning(f"VM with IP {vm_ip} not found.")
         return False
 
 
@@ -92,7 +77,7 @@ def reboot_vms_by_ip_list(ip_list):
             faulty_vm.append(ip)
         else:
             good_vms.append(ip)
-    logger.info(f'Could not find vms with ip - {faulty_vm}\n')
+    logger.warning(f'Could not find vms with ip - {faulty_vm}\n')
     logger.info(f'Vms rebooted successfully - {good_vms}')
     return good_vms
 if __name__ == '__main__':

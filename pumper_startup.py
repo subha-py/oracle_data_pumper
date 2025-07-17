@@ -6,7 +6,10 @@ import subprocess
 from utils.cohesity import get_registered_sources
 from utils.vmware import reboot_vms_by_ip_list
 from utils.memory import check_available_space
+from utils.db import get_db_map_from_vms
+from utils.connection import filter_host_map_by_listener_connectivity
 import logging
+
 def pull_latest_code(repo_path="."):
     logger = logging.getLogger(os.environ.get("log_file_name"))
     logger.info(f"Attempting to pull latest code in: {os.path.abspath(repo_path)}")
@@ -22,13 +25,19 @@ def pull_latest_code(repo_path="."):
 
 def startup_activities():
     set_logger('pumper_startup_logger')
-    pull_latest_code()
-    sources = get_registered_sources(cluster_ip='10.14.7.1')
-    vms = reboot_vms_by_ip_list(sources)
-    # listener start and db up is handled by services in os
-    vms = check_available_space(vms)
-    # write a script to post the services file to all the vms
-    # write a script to change all the entries of /etc/oratab to Y instead of N
+    # pull_latest_code()
+    hosts = get_registered_sources(cluster_ip='10.14.7.1')
+    # # todo: remove rac from this list
+    # # todo: datapump in pdbs
+    # # todo: bigtablespace autoextend
+    # vms = reboot_vms_by_ip_list(sources)
+    for host in hosts:
+        host.reboot()
+
+    # # listener start and db up is handled by services in os
+
+
+
 
 if __name__ == '__main__':
     startup_activities()

@@ -2,6 +2,7 @@ import requests
 import random
 import os
 import logging
+from utils.hosts import Host
 from collections import defaultdict
 def get_node_ips(cluster_ip, username="admin", password="Syst7mt7st", domain="local", access_token=None):
     logger = logging.getLogger(os.environ.get("log_file_name"))
@@ -82,6 +83,6 @@ def get_registered_sources(cluster_ip,source_type='oracle'):
         registrationInfo=source['registrationInfo']
         env = registrationInfo.get('environments')
         if env is not None and source_type in env[0].lower() and 'linux' in source['rootNode']['physicalProtectionSource']['osName'].lower():
-                result.append(registrationInfo['accessInfo']['endpoint'])
+                result.append(Host(ip=registrationInfo['accessInfo']['endpoint']))
     logger.info(f'cluster ip - {cluster_ip}\n \noracle sources - {result}')
     return result

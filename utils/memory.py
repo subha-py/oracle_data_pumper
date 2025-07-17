@@ -85,24 +85,7 @@ def get_number_of_rows(connection):
         value = cursor.fetchone()[0]
     return value
 
-def parse_size_to_gb(size_str):
-    """
-    Converts a size string (e.g. '512M', '1.5G', '2T') to GB as integer.
-    """
-    size_str = size_str.strip().upper()
-    if size_str.endswith('G'):
-        return int(float(size_str[:-1]))
-    elif size_str.endswith('M'):
-        return int(float(size_str[:-1]) / 1024)
-    elif size_str.endswith('T'):
-        return int(float(size_str[:-1]) * 1024)
-    elif size_str.endswith('K'):
-        return int(float(size_str[:-1]) / (1024 * 1024))
-    else:
-        try:
-            return int(float(size_str))  # assume GB if no unit
-        except:
-            return 0
+
 
 def get_remote_disk_usage_multiple_in_gbs(ip, mount_points=None):
     results = {}
@@ -151,7 +134,7 @@ def check_available_space(ips):
             good_vms.append(ip)
         else:
             bad_vms.append(ip)
-    logger.info(f'vms which failed the space check - {bad_vms}')
+    logger.fatal(f'vms which failed the space check - {bad_vms}')
     logger.info(f'vms which passed the space check - {good_vms}')
     return good_vms
 

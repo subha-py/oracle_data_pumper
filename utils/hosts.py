@@ -1,0 +1,215 @@
+import paramiko
+import time
+import os
+from pyVim.connect import SmartConnect, Disconnect
+from pyVmomi import vim
+import ssl
+import time
+import subprocess
+from pyVim.task import WaitForTasks
+import logging
+import os
+from utils.db import DB
+
+from utils.log import set_logger
+from utils.vmware import get_all_vms, find_vm_by_ip, reboot_vm
+from utils.memory import get_number_of_rows_from_file_size
+from itertools import cycle
+import concurrent.futures
+class Host:
+    def __init__(self, ip, vm_name=None, username='oracle', password='cohesity'):
+        self.ip = ip
+        self.vm_name = vm_name
+        self.username = username
+        self.password = password
+        self.log = set_logger(self.ip, os.path.join('logs', 'hosts'))
+        self.timeout = 10*60
+        self.dbs = self.get_oracle_dbs()
+        self.space_available = self.is_space_available()
+
+    def ping(self):
+        try:
+            subprocess.check_output(['ping', '-c', '1', '-W', '1', self.ip], stderr=subprocess.DEVNULL)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+    def wait_for_ping(self):
+        logger = logging.getLogger(os.environ.get("log_file_name"))
+        logger.info(f"Pinging {self.ip} to check availability...")
+        start = time.time()
+        while time.time() - start < self.timeout:
+            if self.ping():
+                logger.info(f"{self.ip} is reachable.")
+                return True
+            time.sleep(5)
+        raise TimeoutError(f"Timed out waiting for {self.ip} to respond to ping.")
+    def reboot(self):
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        si = SmartConnect(host='system-test-vc-fitdb.qa01.eng.cohesity.com', user='administrator@vsphere.local', pwd='Cohe$1ty', sslContext=context)
+        content = si.RetrieveContent()
+        vms = get_all_vms(content)
+        vm = find_vm_by_ip(vms, self.ip)
+        if vm:
+            self.log.info(f"Found VM: {vm.name}")
+            self.vm_name = vm.name
+            reboot_vm(vm, si)
+            self.wait_for_ping()
+            Disconnect(si)
+            return True
+        else:
+            self.log.warning(f"VM with IP {self.ip} not found.")
+            return False
+    def exec_cmds(self, commands, key=None):
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.log.info(f"\n--- Connecting to {self.ip} ---")
+        stdout_output, stderr_output = None, None
+        try:
+            if key:
+                ssh_client.connect(hostname=self.ip, username=self.username, pkey=key, timeout=10)
+            else:
+                ssh_client.connect(hostname=self.ip, username=self.username, password=self.password, timeout=10)
+            self.log.info(f"Successfully connected to {self.ip}")
+
+            for cmd in commands:
+                self.log.info(f"\n  Executing command: '{cmd}'")
+                stdin, stdout, stderr = ssh_client.exec_command(cmd, timeout=30)  # Add timeout for command execution
+
+                # Read stdout and stderr to prevent hanging due to buffer limits
+                stdout_output = stdout.read().decode().strip()
+                stderr_output = stderr.read().decode().strip()
+
+                if stdout_output:
+                    self.log.info(f"  --- STDOUT ---\n{stdout_output}")
+                if stderr_output:
+                    self.log.info(f"  --- STDERR ---\n{stderr_output}")
+
+                # Check exit status of the command
+                exit_status = stdout.channel.recv_exit_status()
+                self.log.info(f"  Command exited with status: {exit_status}")
+                if exit_status != 0:
+                    self.log.info(f"  WARNING: Command '{cmd}' failed on {self.ip}")
+                time.sleep(0.5)  # Small delay between commands
+
+        except paramiko.AuthenticationException:
+            self.log.info(f"Authentication failed for {self.username}@{self.ip}. Please check your credentials.")
+        except paramiko.SSHException as ssh_err:
+            self.log.info(f"SSH error connecting to {self.ip}: {ssh_err}")
+        except paramiko.BadHostKeyException as bhk_err:
+            self.log.info(f"Bad host key for {self.ip}: {bhk_err}. Manual verification needed.")
+        except Exception as e:
+            self.log.info(f"An unexpected error occurred while connecting or executing on {self.ip}: {e}")
+        finally:
+            if ssh_client.get_transport() and ssh_client.get_transport().is_active():
+                self.log.info(f"Closing connection to {self.ip}")
+                ssh_client.close()
+        return stdout_output, stderr_output
+
+    def get_disk_usage_multiple_in_gbs(self, mount_points=None):
+        def parse_size_to_gb(size_str):
+            """
+            Converts a size string (e.g. '512M', '1.5G', '2T') to GB as integer.
+            """
+            size_str = size_str.strip().upper()
+            if size_str.endswith('G'):
+                return int(float(size_str[:-1]))
+            elif size_str.endswith('M'):
+                return int(float(size_str[:-1]) / 1024)
+            elif size_str.endswith('T'):
+                return int(float(size_str[:-1]) * 1024)
+            elif size_str.endswith('K'):
+                return int(float(size_str[:-1]) / (1024 * 1024))
+            else:
+                try:
+                    return int(float(size_str))  # assume GB if no unit
+                except:
+                    return 0
+
+        results = {}
+        if mount_points is None:
+            mount_points = ['/u02', '/']
+        try:
+            # Run df command
+            commands = ["df -h --output=avail,target"]
+            stdout, stderr = self.exec_cmds(commands)
+            df_output = stdout.splitlines()
+
+            if len(df_output) < 2:
+                raise Exception("No disk data received from remote host.")
+
+            # Parse df output
+            disk_data = {}
+            for line in df_output[1:]:  # Skip header
+                parts = line.strip().split()
+                if len(parts) == 2:
+                    avail, target = parts
+                    disk_data[target] = parse_size_to_gb(avail)
+
+            # Fill results
+            for mount in mount_points:
+                results[mount] = disk_data.get(mount, 0)
+
+        except Exception as e:
+            return {mp: -1 for mp in mount_points}
+
+        return results
+
+    def get_oracle_dbs(self, oratab_path='/etc/oratab'):
+        oracle_dbs = []
+        try:
+            command = f"grep -v '^#' {oratab_path} | grep -v '^$'"
+            stdout, stderr = self.exec_cmds([command])
+
+            if stderr:
+                raise Exception(f"Error reading oratab: {stderr.strip()}")
+
+            for line in stdout.strip().splitlines():
+                parts = line.strip().split(":")
+                if len(parts) >= 2:
+                    sid = parts[0].strip().upper()
+                    oracle_dbs.append(DB(sid, self))
+            return oracle_dbs
+
+        except Exception as e:
+            print(f"Failed to fetch Oracle DBs: {e}")
+            return []
+
+    def is_space_available(self):
+        mount_points = ['/u02', '/']
+        result = self.get_disk_usage_multiple_in_gbs(mount_points)
+        self.log.info(f'current space usaage of {mount_points} -> {result}')
+        if result['/u02'] < 50:
+            return False
+        elif result['/'] < 2:
+            return False
+        return True
+    def pump_eligible_dbs(self):
+        # hosts who have enough space
+        # db who is accessible over listener
+        # db who have set db_files more than > 200
+        # dbs who have at least 100 tables
+        # db whose fra limit > 1TB
+        pass
+    def execute_pumper(self):
+        self.batch_size = 10000
+        self.total_dbs = len(self.dbs)
+        self.num_workers = 10
+        self.pump_size_in_gb = '100G'
+        self.datafile_size = '2G'
+        self.total_rows_required = get_number_of_rows_from_file_size(self.pump_size_in_gb)
+        self.total_number_of_batches = self.total_rows_required // self.batch_size
+        future_to_batch = {}
+        db_cycle = cycle(self.dbs)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            for batch_number in range(1, self.total_number_of_batches+1):
+                db = next(db_cycle)
+
+    def __repr__(self):
+        return self.ip
+
+
+if __name__ == '__main__':
+    host_obj = Host('10.14.69.139')
+    print(host_obj)

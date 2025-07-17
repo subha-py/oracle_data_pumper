@@ -119,7 +119,7 @@ def create_todo_item_table(connection, db_name, datafile_size,
                                dest_recovery_size, autoextend, create_table, multi_table):
     set_recovery_file_dest_size(connection, dest_recovery_size)
     existing_tables = list_all_todoitem_tables(connection, multi_table)
-
+    # if not all tables created, create the ones required
     def should_create():
         return create_table or not existing_tables
 
