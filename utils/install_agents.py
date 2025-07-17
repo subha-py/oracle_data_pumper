@@ -1,15 +1,12 @@
 import paramiko
 import time
 from utils.log import set_logger
-# --- Configuration ---
-output = '/home/oracle/master_16_05'
-installer = f'https://artifactory.eng.cohesity.com/artifactory/cohesity-builds-smoke/master/20250615-200911/qa_minimal/internal_only_rpms_package/cohesity_agent_0.0.0-master_linux_x64_installer -O {output}'
-# output = '/home/oracle/7.1.2_u4_installer'
-# installer = f'https://sv4-pluto.eng.cohesity.com/bugs/sbera_backups/cohesity_agent_7.1.2_u4_linux_x64_installer -O {output}'
+
 ST_05_HOSTS = [
     "10.14.69.210",
     "10.14.69.211", "10.3.63.147", "10.14.69.123", "10.14.69.212",
-    "10.3.60.135", "10.14.70.98", "10.3.63.223", "10.14.69.165", "10.14.69.183",
+    # "10.3.60.131","10.3.60.132", # --> rac setups
+    "10.14.70.98", "10.3.63.223", "10.14.69.165", "10.14.69.183",
     "10.3.63.223", "10.3.63.231", "10.3.63.232", "10.3.63.233", "10.3.63.141",
     "10.14.70.148", "10.14.70.135", "10.14.70.156", "10.14.70.147",
     "10.14.69.220", "10.14.69.221", "10.14.69.222"
@@ -31,22 +28,22 @@ ST_MASTER_HOSTS = [
     '10.3.63.230', '10.3.63.139', '10.14.70.136', '10.14.70.134', '10.14.70.159',
     '10.14.70.146',
 ]
-HOSTS = ST_AUTO_HOSTS + ST_05_HOSTS + ST_MASTER_HOSTS
 
-USERNAME = 'root'  # SSH username
 
-# --- IMPORTANT: CHOOSE ONE PASSWORD METHOD ---
-# 1. Directly in script (NOT RECOMMENDED for production)
+USERNAME = 'root'
 PASSWORD = 'root'
 
-# COMMANDS = [
-#     f'wget {installer}',
-#     f'chmod +x {output}',
-#     f'sudo {output} -- --full-uninstall -y',
-#     f'sudo {output} -- --install -S oracle -G oinstall -c 0 -I /home/oracle -y'
-# ]
 
-COMMANDS=[
+output = '/home/oracle/master_16_05'
+installer = f'https://artifactory.eng.cohesity.com/artifactory/cohesity-builds-smoke/master/20250615-200911/qa_minimal/internal_only_rpms_package/cohesity_agent_0.0.0-master_linux_x64_installer -O {output}'
+INSTALL_AGENT_COMMANDS = [
+    f'wget {installer}',
+    f'chmod +x {output}',
+    f'sudo {output} -- --full-uninstall -y',
+    f'sudo {output} -- --install -S oracle -G oinstall -c 0 -I /home/oracle -y'
+]
+
+SERVICES_COMMANDS=[
     'wget https://sv4-pluto.eng.cohesity.com/bugs/sbera_backups/services/oracle-listener.service -O /etc/systemd/system/oracle-listener.service',
     'wget https://sv4-pluto.eng.cohesity.com/bugs/sbera_backups/services/oracle-database.service -O /etc/systemd/system/oracle-database.service',
     'sudo systemctl daemon-reexec','sudo systemctl daemon-reload',
@@ -54,6 +51,10 @@ COMMANDS=[
     'sudo systemctl enable oracle-database.service', 'sudo systemctl start oracle-database.service',
     'sudo systemctl status oracle-listener.service', 'sudo systemctl status oracle-database.service'
 ]
+ORATAB_COMMANDS = [r"sudo sed -i 's/^\([^#][^:]*:[^:]*:\)N/\1Y/' /etc/oratab"]
+
+HOSTS = ST_AUTO_HOSTS + ST_05_HOSTS + ST_MASTER_HOSTS
+COMMANDS = ORATAB_COMMANDS
 def execute_commands_on_host(hostname, username, password, commands, logger, ssh_client, key=None):
     logger.info(f"\n--- Connecting to {hostname} ---")
     try:
