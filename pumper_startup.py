@@ -27,9 +27,9 @@ def startup_activities():
     set_logger('pumper_startup_logger')
     # pull_latest_code()
     hosts = get_registered_sources(cluster_ip='10.14.7.1')
-    # # todo: remove rac from this list
-    # # todo: datapump in pdbs
-    # # todo: bigtablespace autoextend
+    # # todo: remove rac from this list - should have rac in its name
+    # # todo: datapump in pdbs - should have cdb in its name
+    # # todo: bigtablespace autoextend -> the db name should have big in its name
     # vms = reboot_vms_by_ip_list(sources)
     for host in hosts:
         host.reboot()

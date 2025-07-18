@@ -15,6 +15,8 @@ from utils.log import set_logger
 from utils.vmware import get_all_vms, find_vm_by_ip, reboot_vm
 from utils.memory import get_number_of_rows_from_file_size
 from itertools import cycle
+from threading import Lock
+from decorators import retry
 import concurrent.futures
 class Host:
     def __init__(self, ip, vm_name=None, username='oracle', password='cohesity'):
@@ -24,9 +26,15 @@ class Host:
         self.password = password
         self.log = set_logger(self.ip, os.path.join('logs', 'hosts'))
         self.timeout = 10*60
+        self.is_healthy = True
+        self.pumpable_dbs = []
+        self.num_workers = 10
+        self.pump_size_in_gb = '100G'
+        self.batch_size = 10000
+        self.total_rows_required = get_number_of_rows_from_file_size(self.pump_size_in_gb)
+        self.total_number_of_batches = self.total_rows_required // self.batch_size
         self.dbs = self.get_oracle_dbs()
-        self.space_available = self.is_space_available()
-
+        self.total_dbs = len(self.dbs)
     def ping(self):
         try:
             subprocess.check_output(['ping', '-c', '1', '-W', '1', self.ip], stderr=subprocess.DEVNULL)
@@ -40,72 +48,77 @@ class Host:
         while time.time() - start < self.timeout:
             if self.ping():
                 logger.info(f"{self.ip} is reachable.")
-                return True
             time.sleep(5)
-        raise TimeoutError(f"Timed out waiting for {self.ip} to respond to ping.")
+        self.is_healthy = False
     def reboot(self):
-        context = ssl.create_default_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-        si = SmartConnect(host='system-test-vc-fitdb.qa01.eng.cohesity.com', user='administrator@vsphere.local', pwd='Cohe$1ty', sslContext=context)
-        content = si.RetrieveContent()
-        vms = get_all_vms(content)
-        vm = find_vm_by_ip(vms, self.ip)
-        if vm:
-            self.log.info(f"Found VM: {vm.name}")
-            self.vm_name = vm.name
-            reboot_vm(vm, si)
-            self.wait_for_ping()
-            Disconnect(si)
-            return True
-        else:
-            self.log.warning(f"VM with IP {self.ip} not found.")
-            return False
-    def exec_cmds(self, commands, key=None):
-        ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.log.info(f"\n--- Connecting to {self.ip} ---")
-        stdout_output, stderr_output = None, None
-        try:
-            if key:
-                ssh_client.connect(hostname=self.ip, username=self.username, pkey=key, timeout=10)
+        if self.is_healthy:
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            si = SmartConnect(host='system-test-vc-fitdb.qa01.eng.cohesity.com', user='administrator@vsphere.local', pwd='Cohe$1ty', sslContext=context)
+            content = si.RetrieveContent()
+            vms = get_all_vms(content)
+            vm = find_vm_by_ip(vms, self.ip)
+            if vm:
+                self.is_healthy = True
+                self.log.info(f"Found VM: {vm.name}")
+                self.vm_name = vm.name
+                reboot_vm(vm, si)
+                self.wait_for_ping()
+                Disconnect(si)
             else:
-                ssh_client.connect(hostname=self.ip, username=self.username, password=self.password, timeout=10)
-            self.log.info(f"Successfully connected to {self.ip}")
+                self.log.warning(f"VM with IP {self.ip} not found.")
+                self.is_healthy = False
 
-            for cmd in commands:
-                self.log.info(f"\n  Executing command: '{cmd}'")
-                stdin, stdout, stderr = ssh_client.exec_command(cmd, timeout=30)  # Add timeout for command execution
+    def exec_cmds(self, commands, key=None, timeout=5*60):
+        if self.is_healthy:
+            ssh_client = paramiko.SSHClient()
+            ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            self.log.info(f"\n--- Connecting to {self.ip} ---")
+            stdout_output, stderr_output = None, None
+            try:
+                if key:
+                    ssh_client.connect(hostname=self.ip, username=self.username, pkey=key, timeout=timeout)
+                else:
+                    ssh_client.connect(hostname=self.ip, username=self.username, password=self.password, timeout=timeout)
+                self.log.info(f"Successfully connected to {self.ip}")
 
-                # Read stdout and stderr to prevent hanging due to buffer limits
-                stdout_output = stdout.read().decode().strip()
-                stderr_output = stderr.read().decode().strip()
+                for cmd in commands:
+                    self.log.info(f"\n  Executing command: '{cmd}'")
+                    stdin, stdout, stderr = ssh_client.exec_command(cmd, timeout=30)  # Add timeout for command execution
 
-                if stdout_output:
-                    self.log.info(f"  --- STDOUT ---\n{stdout_output}")
-                if stderr_output:
-                    self.log.info(f"  --- STDERR ---\n{stderr_output}")
+                    # Read stdout and stderr to prevent hanging due to buffer limits
+                    stdout_output = stdout.read().decode().strip()
+                    stderr_output = stderr.read().decode().strip()
 
-                # Check exit status of the command
-                exit_status = stdout.channel.recv_exit_status()
-                self.log.info(f"  Command exited with status: {exit_status}")
-                if exit_status != 0:
-                    self.log.info(f"  WARNING: Command '{cmd}' failed on {self.ip}")
-                time.sleep(0.5)  # Small delay between commands
+                    if stdout_output:
+                        self.log.info(f"  --- STDOUT ---\n{stdout_output}")
+                    if stderr_output:
+                        self.log.info(f"  --- STDERR ---\n{stderr_output}")
 
-        except paramiko.AuthenticationException:
-            self.log.info(f"Authentication failed for {self.username}@{self.ip}. Please check your credentials.")
-        except paramiko.SSHException as ssh_err:
-            self.log.info(f"SSH error connecting to {self.ip}: {ssh_err}")
-        except paramiko.BadHostKeyException as bhk_err:
-            self.log.info(f"Bad host key for {self.ip}: {bhk_err}. Manual verification needed.")
-        except Exception as e:
-            self.log.info(f"An unexpected error occurred while connecting or executing on {self.ip}: {e}")
-        finally:
-            if ssh_client.get_transport() and ssh_client.get_transport().is_active():
-                self.log.info(f"Closing connection to {self.ip}")
-                ssh_client.close()
-        return stdout_output, stderr_output
+                    # Check exit status of the command
+                    exit_status = stdout.channel.recv_exit_status()
+                    self.log.info(f"  Command exited with status: {exit_status}")
+                    if exit_status != 0:
+                        self.log.info(f"  WARNING: Command '{cmd}' failed on {self.ip}")
+                    time.sleep(0.5)  # Small delay between commands
+
+            except paramiko.AuthenticationException:
+                self.log.info(f"Authentication failed for {self.username}@{self.ip}. Please check your credentials.")
+                self.is_healthy = False
+            except paramiko.SSHException as ssh_err:
+                self.log.info(f"SSH error connecting to {self.ip}: {ssh_err}")
+                self.is_healthy = False
+            except paramiko.BadHostKeyException as bhk_err:
+                self.log.info(f"Bad host key for {self.ip}: {bhk_err}. Manual verification needed.")
+                self.is_healthy = False
+            except Exception as e:
+                self.log.info(f"An unexpected error occurred while connecting or executing on {self.ip}: {e}")
+            finally:
+                if ssh_client.get_transport() and ssh_client.get_transport().is_active():
+                    self.log.info(f"Closing connection to {self.ip}")
+                    ssh_client.close()
+            return stdout_output, stderr_output
 
     def get_disk_usage_multiple_in_gbs(self, mount_points=None):
         def parse_size_to_gb(size_str):
@@ -158,6 +171,7 @@ class Host:
 
     def get_oracle_dbs(self, oratab_path='/etc/oratab'):
         oracle_dbs = []
+        sid = None
         try:
             command = f"grep -v '^#' {oratab_path} | grep -v '^$'"
             stdout, stderr = self.exec_cmds([command])
@@ -169,42 +183,47 @@ class Host:
                 parts = line.strip().split(":")
                 if len(parts) >= 2:
                     sid = parts[0].strip().upper()
+                try:
                     oracle_dbs.append(DB(sid, self))
+                except Exception as e:
+                    self.log.fatal(f'Cannot create db object for - db - {sid} due to {e}')
             return oracle_dbs
 
         except Exception as e:
-            print(f"Failed to fetch Oracle DBs: {e}")
+            self.log.fatal(f"Failed to fetch Oracle DBs: {e}")
+            self.is_healthy = False
             return []
 
     def is_space_available(self):
         mount_points = ['/u02', '/']
         result = self.get_disk_usage_multiple_in_gbs(mount_points)
-        self.log.info(f'current space usaage of {mount_points} -> {result}')
-        if result['/u02'] < 50:
-            return False
+        self.log.info(f'current space usage of {mount_points} -> {result}')
+        if result['/u02'] < 300: #todo: take dynamically from self.pump_size_in_gb
+            self.is_healthy = False
         elif result['/'] < 2:
-            return False
-        return True
-    def pump_eligible_dbs(self):
+            self.is_healthy = False
+        return
+    def prepare_pump_eligible_dbs(self):
         # hosts who have enough space
-        # db who is accessible over listener
-        # db who have set db_files more than > 200
-        # dbs who have at least 100 tables
-        # db whose fra limit > 1TB
-        pass
+        self.is_space_available()
+        if not self.is_healthy:
+            return
+        for db in self.dbs:
+            if db.is_pumpable():
+                self.pumpable_dbs.append(db)
+
     def execute_pumper(self):
-        self.batch_size = 10000
-        self.total_dbs = len(self.dbs)
-        self.num_workers = 10
-        self.pump_size_in_gb = '100G'
-        self.datafile_size = '2G'
-        self.total_rows_required = get_number_of_rows_from_file_size(self.pump_size_in_gb)
-        self.total_number_of_batches = self.total_rows_required // self.batch_size
+        self.prepare_pump_eligible_dbs()
         future_to_batch = {}
-        db_cycle = cycle(self.dbs)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-            for batch_number in range(1, self.total_number_of_batches+1):
-                db = next(db_cycle)
+        db_cycle = cycle(self.pumpable_dbs)
+
+        # todo: put multithreading after debugging
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+        lock = Lock()
+        for batch_number in range(1, self.total_number_of_batches+1):
+            db = next(db_cycle)
+            if db.is_pumpable():
+                db.process_batch(batch_number, self.total_number_of_batches, lock)
 
     def __repr__(self):
         return self.ip
@@ -212,4 +231,4 @@ class Host:
 
 if __name__ == '__main__':
     host_obj = Host('10.14.69.139')
-    print(host_obj)
+    host_obj.execute_pumper()
