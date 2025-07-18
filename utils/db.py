@@ -58,9 +58,10 @@ class DB:
 
     def get_tables(self):
         query = "SELECT table_name from all_tables WHERE table_name LIKE '%TODOITEM%'"
-        table_names = self.run_query(query)[0]
+        table_names = self.run_query(query)
         for table in table_names:
-            self.tables.append(Table(db=self,name=table))
+            table_name = table[0]
+            self.tables.append(Table(db=self,name=table_name))
 
 
     def delete_table(self, tablename='todoitem'):
@@ -94,15 +95,12 @@ class DB:
         return result
 
     def create_tables(self):
-        number_of_tables_to_be_created = self.target_table_count
         number_of_tables = len(self.tables)
         if len(self.host.dbs) > 2:
             self.target_table_count = self.target_table_count//2
-        if number_of_tables < self.target_table_count:
-            number_of_tables_to_be_created = self.target_table_count - number_of_tables
+        number_of_tables_to_be_created = max(self.target_table_count - number_of_tables, 0)
         for i in range(number_of_tables_to_be_created):
             self.tables.append(Table(db=self))
-        self.is_healthy = len(self.tables) == self.target_table_count
 
 
 
