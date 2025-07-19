@@ -34,7 +34,7 @@ class Table:
     def is_created(self):
         if self.name is None:
             return False
-        query = f"SELECT table_name FROM all_tables WHERE table_name LIKE '%{self.name}'"
+        query = f"SELECT table_name FROM all_tables WHERE table_name='{self.name}'"
         result = self.db.run_query(query)[0][0]
         return len(result) > 0
 

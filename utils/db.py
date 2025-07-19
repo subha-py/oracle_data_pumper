@@ -9,6 +9,7 @@ import sys
 from oracledb.exceptions import DatabaseError, InterfaceError
 import pathlib
 from utils.tables import Table
+from utils.memory import human_read_to_byte
 class DB:
     def __init__(self, db_name, host, username='sys', password='cohesity', type='standalone'):
         self.db_name = db_name
@@ -20,9 +21,12 @@ class DB:
         self.is_healthy = True
         self.target_table_count = 100
         self.tables = []
-
+        self.fra_limit_set = None
+        self.db_files_limit_set = None
 
         self.get_tables()
+        self.get_fra_limit()
+        self.get_dbfiles_limit()
 
     def connect(self):
         return connect_to_oracle(self.host, self.db_name)
@@ -38,23 +42,40 @@ class DB:
             try:
                 cursor.execute(query)
                 result = cursor.fetchall()
+                self.log.info(f'query - {query} successfully executed - {self}')
                 return result
             except InterfaceError as e:
                 if 'the executed statement does not return rows' in str(e):
                     self.log.info(f'query executed successfully - {query}')
+                    return True
             except Exception as e:
                 self.log.info(f'cannot set query - {query} in {self.host}:{self} got error - {e}')
                 return []
 
-    def set_fra_limit(self):
-        # todo: write set only get fra_limit is not set
-        set_recovery_file_dest_size = 'alter system set db_recovery_file_dest_size=2000G scope=both'
-        self.run_query(set_recovery_file_dest_size)
+    def get_fra_limit(self):
+        try:
+            result = self.run_query("SELECT name,value FROM v$parameter WHERE name='db_recovery_file_dest_size'")[0][1]
+            if int(result) >= human_read_to_byte('1024G'):
+                self.fra_limit_set = True
+        except IndexError:
+            self.log.info('Cannot get fra limit')
 
+    def set_fra_limit(self):
+        if not self.fra_limit_set:
+            set_recovery_file_dest_size = 'alter system set db_recovery_file_dest_size=2000G scope=both'
+            self.run_query(set_recovery_file_dest_size)
+
+    def get_dbfiles_limit(self):
+        try:
+            result = self.run_query("select value from v$parameter where name = 'db_files'")[0][0]
+            if int(result) >= 1000:
+                self.db_files_limit_set = True
+        except IndexError:
+            self.log.info('Cannot get db files limit')
     def set_db_files_limit(self):
-        # todo: write set only get db_files limit is not set
-        set_db_files = 'alter system set db_files=20000 scope=spfile'
-        self.run_query(set_db_files)
+        if not self.db_files_limit_set:
+            set_db_files = 'alter system set db_files=20000 scope=spfile'
+            self.run_query(set_db_files)
 
     def get_tables(self):
         query = "SELECT table_name from all_tables WHERE table_name LIKE '%TODOITEM%'"
@@ -111,7 +132,8 @@ class DB:
         # have atleast 100 tables
         # todo: if cdb in name should have atleast one pdb reachable via listener
         # todo: if big in name should have only ony table with name todoitem
-        self.is_listener_connectivity_available()
+        if not self.connection:
+            self.is_listener_connectivity_available()
         self.set_fra_limit()
         self.set_db_files_limit()
         self.create_tables()
@@ -155,5 +177,5 @@ def get_db_map_from_vms(ips):
         result[ip] = dbs
     return result
 if __name__ == '__main__':
-    dbs = get_remote_oracle_dbs('10.14.69.139')
+    dbs = connect_to_oracle('10.131.37.81', 'SBTDB')
     print(dbs)

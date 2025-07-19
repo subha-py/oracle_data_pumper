@@ -25,4 +25,4 @@ def filter_host_map_by_listener_connectivity(hostmap):
     logger.info(f'Final hostmap on which data pumping will happen {hostmap}')
     return hostmap
 if __name__ == '__main__':
-    conn = connect_to_oracle('10.14.69.187', 'FIDB10')
+    conn = connect_to_oracle('10.14.70.149', 'bctstat')

@@ -53,8 +53,9 @@ SERVICES_COMMANDS=[
 ]
 ORATAB_COMMANDS = [r"sudo sed -i 's/^\([^#][^:]*:[^:]*:\)N/\1Y/' /etc/oratab"]
 
-HOSTS = ST_AUTO_HOSTS + ST_05_HOSTS + ST_MASTER_HOSTS
-COMMANDS = ORATAB_COMMANDS
+# HOSTS = ST_AUTO_HOSTS + ST_05_HOSTS + ST_MASTER_HOSTS
+COMMANDS = SERVICES_COMMANDS
+HOSTS = ['10.131.37.81']
 def execute_commands_on_host(hostname, username, password, commands, logger, ssh_client, key=None):
     logger.info(f"\n--- Connecting to {hostname} ---")
     try:

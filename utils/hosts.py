@@ -281,19 +281,29 @@ class Host:
         self.prepare_pump_eligible_dbs()
         future_to_batch = {}
         db_cycle = cycle(self.pumpable_dbs)
-
-        # todo: put multithreading after debugging
-        # with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-        lock = Lock()
-        for batch_number in range(1, self.total_number_of_batches+1):
-            db = next(db_cycle)
-            if db.is_pumpable():
-                db.process_batch(batch_number, self.total_number_of_batches, lock)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            lock = Lock()
+            for batch_number in range(1, self.total_number_of_batches+1):
+                db = next(db_cycle)
+                if db.is_pumpable():
+                    args = (batch_number, self.total_number_of_batches, lock)
+                    future = executor.submit(db.process_batch, *args)
+                    future_to_batch[future] = batch_number
+        result = []
+        for future in concurrent.futures.as_completed(future_to_batch):
+            batch_number = future_to_batch[future]
+            try:
+                res = future.result()
+                if not res:
+                    result.append(batch_number)
+            except Exception as exc:
+                print(f"Batch {batch_number} failed: {exc}")
+        return result
 
     def __repr__(self):
         return self.ip
 
 
 if __name__ == '__main__':
-    host_obj = Host('10.14.69.139')
+    host_obj = Host('10.14.70.149')
     host_obj.execute_pumper()
