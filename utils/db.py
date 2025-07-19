@@ -126,10 +126,6 @@ class DB:
 
 
     def is_pumpable(self):
-        # can connect over listener
-        # have db_files param set
-        # have fra param set
-        # have atleast 100 tables
         # todo: if cdb in name should have atleast one pdb reachable via listener
         # todo: if big in name should have only ony table with name todoitem
         if not self.connection:
@@ -146,36 +142,6 @@ class DB:
     def __repr__(self):
         return f"{self.host}:{self.db_name}"
 
-
-
-def get_remote_oracle_dbs(host, oratab_path='/etc/oratab'):
-    oracle_sids = []
-    try:
-
-        command = f"grep -v '^#' {oratab_path} | grep -v '^$'"
-        stdout, stderr = execute_commands_on_host(host,[command])
-
-        if stderr:
-            raise Exception(f"Error reading oratab: {stderr.strip()}")
-
-        for line in stdout.strip().splitlines():
-            parts = line.strip().split(":")
-            if len(parts) >= 2:
-                sid = parts[0].strip().upper()
-                oracle_sids.append(sid)
-        return oracle_sids
-
-    except Exception as e:
-        print(f"Failed to fetch Oracle DBs: {e}")
-        return []
-def get_db_map_from_vms(ips):
-    logger = logging.getLogger(os.environ.get("log_file_name"))
-    result = defaultdict(list)
-    for ip in ips:
-        dbs = get_remote_oracle_dbs(ip)
-        logger.info(f'for host -> {ip} got dbs -> {dbs}')
-        result[ip] = dbs
-    return result
 if __name__ == '__main__':
     dbs = connect_to_oracle('10.131.37.81', 'SBTDB')
     print(dbs)

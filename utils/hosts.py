@@ -134,57 +134,6 @@ class Host:
                 self.log.info(f"All retry attempts exhausted for {self.ip}. Giving up.")
 
         return None, None  # Return None if all attempts failed
-
-    # def exec_cmds(self, commands, key=None, timeout=5*60):
-    #     if self.is_healthy:
-    #         ssh_client = paramiko.SSHClient()
-    #         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    #         self.log.info(f"\n--- Connecting to {self.ip} ---")
-    #         stdout_output, stderr_output = None, None
-    #         try:
-    #             if key:
-    #                 ssh_client.connect(hostname=self.ip, username=self.username, pkey=key, timeout=timeout)
-    #             else:
-    #                 ssh_client.connect(hostname=self.ip, username=self.username, password=self.password, timeout=timeout)
-    #             self.log.info(f"Successfully connected to {self.ip}")
-    #
-    #             for cmd in commands:
-    #                 self.log.info(f"\n  Executing command: '{cmd}'")
-    #                 stdin, stdout, stderr = ssh_client.exec_command(cmd, timeout=30)  # Add timeout for command execution
-    #
-    #                 # Read stdout and stderr to prevent hanging due to buffer limits
-    #                 stdout_output = stdout.read().decode().strip()
-    #                 stderr_output = stderr.read().decode().strip()
-    #
-    #                 if stdout_output:
-    #                     self.log.info(f"  --- STDOUT ---\n{stdout_output}")
-    #                 if stderr_output:
-    #                     self.log.info(f"  --- STDERR ---\n{stderr_output}")
-    #
-    #                 # Check exit status of the command
-    #                 exit_status = stdout.channel.recv_exit_status()
-    #                 self.log.info(f"  Command exited with status: {exit_status}")
-    #                 if exit_status != 0:
-    #                     self.log.info(f"  WARNING: Command '{cmd}' failed on {self.ip}")
-    #                 time.sleep(0.5)  # Small delay between commands
-    #
-    #         except paramiko.AuthenticationException:
-    #             self.log.info(f"Authentication failed for {self.username}@{self.ip}. Please check your credentials.")
-    #             self.is_healthy = False
-    #         except paramiko.SSHException as ssh_err:
-    #             self.log.info(f"SSH error connecting to {self.ip}: {ssh_err}")
-    #             self.is_healthy = False
-    #         except paramiko.BadHostKeyException as bhk_err:
-    #             self.log.info(f"Bad host key for {self.ip}: {bhk_err}. Manual verification needed.")
-    #             self.is_healthy = False
-    #         except Exception as e:
-    #             self.log.info(f"An unexpected error occurred while connecting or executing on {self.ip}: {e}")
-    #         finally:
-    #             if ssh_client.get_transport() and ssh_client.get_transport().is_active():
-    #                 self.log.info(f"Closing connection to {self.ip}")
-    #                 ssh_client.close()
-    #         return stdout_output, stderr_output
-
     def get_disk_usage_multiple_in_gbs(self, mount_points=None):
         def parse_size_to_gb(size_str):
             """
@@ -299,6 +248,9 @@ class Host:
             except Exception as exc:
                 print(f"Batch {batch_number} failed: {exc}")
         return result
+    def reboot_and_pump_data(self):
+        self.reboot()
+        self.execute_pumper()
 
     def __repr__(self):
         return self.ip

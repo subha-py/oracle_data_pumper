@@ -9,6 +9,7 @@ from utils.memory import check_available_space
 from utils.db import get_db_map_from_vms
 from utils.connection import filter_host_map_by_listener_connectivity
 import logging
+import concurrent.futures
 
 def pull_latest_code(repo_path="."):
     logger = logging.getLogger(os.environ.get("log_file_name"))
@@ -25,17 +26,28 @@ def pull_latest_code(repo_path="."):
 
 def startup_activities():
     set_logger('pumper_startup_logger')
-    # pull_latest_code()
+    pull_latest_code()
     hosts = get_registered_sources(cluster_ip='10.14.7.1')
-    # # todo: remove rac from this list - should have rac in its name
-    # # todo: datapump in pdbs - should have cdb in its name
-    # # todo: bigtablespace autoextend -> the db name should have big in its name
-    # vms = reboot_vms_by_ip_list(sources)
-    for host in hosts:
-        host.reboot()
-
-    # # listener start and db up is handled by services in os
-
+    # todo: remove rac from this list - should have rac in its name
+    # todo: datapump in pdbs - should have cdb in its name
+    # todo: bigtablespace autoextend -> the db name should have big in its name
+    # todo: create a new report in html after each run
+    # todo: ship logs to pluto
+    future_to_batch = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
+        for host in hosts:
+            future = executor.submit(host.reboot_and_pump_data)
+            future_to_batch[future] = host.ip
+    result = []
+    for future in concurrent.futures.as_completed(future_to_batch):
+        batch_number = future_to_batch[future]
+        try:
+            res = future.result()
+            if not res:
+                result.append(batch_number)
+        except Exception as exc:
+            print(f"Batch {batch_number} failed: {exc}")
+    return result
 
 
 

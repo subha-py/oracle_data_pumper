@@ -7,7 +7,6 @@ class Tablespace:
     def __init__(self, db, table, data_filesize='2G',name=None, autoextend=False, random_size=True):
         self.name = name
         self.data_filesize = data_filesize
-        # todo: if tablespace is already there get size dynamically via query
         self.autoextend = autoextend
         self.random_size = random_size
         self.db = db
@@ -88,5 +87,6 @@ class Tablespace:
             except DatabaseError as e:
                 if "does not exist" in str(e):
                     return
+
     def __repr__(self):
         return self.name
