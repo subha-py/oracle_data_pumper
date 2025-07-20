@@ -1,15 +1,15 @@
 #!/u02/oracle_data_pumper/venv/bin/python
 # /etc/systemd/system/pumper-startup.service uses this file in pumper
+import random
+
 from utils.log import set_logger
 import os
 import subprocess
 from utils.cohesity import get_registered_sources
-from utils.vmware import reboot_vms_by_ip_list
-from utils.memory import check_available_space
-from utils.db import get_db_map_from_vms
-from utils.connection import filter_host_map_by_listener_connectivity
 import logging
 import concurrent.futures
+from utils.hosts import Host
+from itertools import cycle
 
 def pull_latest_code(repo_path="."):
     logger = logging.getLogger(os.environ.get("log_file_name"))
@@ -25,28 +25,53 @@ def pull_latest_code(repo_path="."):
     return result
 
 def startup_activities():
-    set_logger('pumper_startup_logger')
-    pull_latest_code()
-    hosts = get_registered_sources(cluster_ip='10.14.7.1')
+    # set_logger('pumper_startup_logger')
+    # pull_latest_code()
+    # hosts = get_registered_sources(cluster_ip='10.14.7.1')
     # todo: remove rac from this list - should have rac in its name
     # todo: datapump in pdbs - should have cdb in its name
     # todo: bigtablespace autoextend -> the db name should have big in its name
     # todo: create a new report in html after each run
     # todo: ship logs to pluto
-    future_to_batch = {}
+    hosts = [
+        Host('10.14.70.149'),
+        Host('10.14.69.139')
+    ]
+    future_to_hosts = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
         for host in hosts:
-            future = executor.submit(host.reboot_and_pump_data)
-            future_to_batch[future] = host.ip
+                future = executor.submit(host.reboot_and_prepare)
+                future_to_hosts[future] = host
+        result = []
+        for future in concurrent.futures.as_completed(future_to_hosts):
+            host = future_to_hosts[future]
+            try:
+                res = future.result()
+                if not res:
+                    result.append(host)
+            except Exception as exc:
+                print(f"Batch {host} failed: {exc}")
+    # at this point all pumpable dbs are prepared
+    all_scheduled_dbs = []
+
+    for host in hosts:
+        all_scheduled_dbs.extend(host.scheduled_dbs)
+    random.shuffle(all_scheduled_dbs)
+    future_to_dbs = {}
     result = []
-    for future in concurrent.futures.as_completed(future_to_batch):
-        batch_number = future_to_batch[future]
-        try:
-            res = future.result()
-            if not res:
-                result.append(batch_number)
-        except Exception as exc:
-            print(f"Batch {batch_number} failed: {exc}")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=128) as executor:
+        for db in all_scheduled_dbs:
+                future = executor.submit(db.process_batch)
+                future_to_dbs[future] = str(db)
+        for future in concurrent.futures.as_completed(future_to_hosts):
+            db = future_to_dbs[future]
+            try:
+                res = future.result()
+                if not res:
+                    result.append(db)
+            except Exception as exc:
+                print(f"Batch {db} failed: {exc}")
+    # tasks got created
     return result
 
 

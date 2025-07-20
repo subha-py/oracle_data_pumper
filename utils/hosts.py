@@ -15,7 +15,7 @@ from utils.log import set_logger
 from utils.vmware import get_all_vms, find_vm_by_ip, reboot_vm
 from utils.memory import get_number_of_rows_from_file_size
 from itertools import cycle
-from threading import Lock
+
 import concurrent.futures
 class Host:
     def __init__(self, ip, vm_name=None, username='oracle', password='cohesity'):
@@ -32,8 +32,10 @@ class Host:
         self.batch_size = 10000
         self.total_rows_required = get_number_of_rows_from_file_size(self.pump_size_in_gb)
         self.total_number_of_batches = self.total_rows_required // self.batch_size
-        self.dbs = self.get_oracle_dbs()
-        self.total_dbs = len(self.dbs)
+        self.dbs = []
+        self.total_dbs = 0
+        self.curr_number_of_batch = 0
+        self.scheduled_dbs = []
     def ping(self):
         try:
             subprocess.check_output(['ping', '-c', '1', '-W', '1', self.ip], stderr=subprocess.DEVNULL)
@@ -41,12 +43,11 @@ class Host:
         except subprocess.CalledProcessError:
             return False
     def wait_for_ping(self):
-        logger = logging.getLogger(os.environ.get("log_file_name"))
-        logger.info(f"Pinging {self.ip} to check availability...")
         start = time.time()
         while time.time() - start < self.timeout:
             if self.ping():
-                logger.info(f"{self.ip} is reachable.")
+                self.log.info(f"{self.ip} is reachable.")
+                return
             time.sleep(5)
         self.is_healthy = False
     def reboot(self):
@@ -59,12 +60,12 @@ class Host:
             vms = get_all_vms(content)
             vm = find_vm_by_ip(vms, self.ip)
             if vm:
-                self.is_healthy = True
                 self.log.info(f"Found VM: {vm.name}")
                 self.vm_name = vm.name
                 reboot_vm(vm, si)
                 self.wait_for_ping()
                 Disconnect(si)
+
             else:
                 self.log.warning(f"VM with IP {self.ip} not found.")
                 self.is_healthy = False
@@ -226,18 +227,16 @@ class Host:
             if db.is_pumpable():
                 self.pumpable_dbs.append(db)
 
-    def execute_pumper(self):
-        self.prepare_pump_eligible_dbs()
+    def execute_pumper(self, executor):
         future_to_batch = {}
         db_cycle = cycle(self.pumpable_dbs)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-            lock = Lock()
-            for batch_number in range(1, self.total_number_of_batches+1):
-                db = next(db_cycle)
-                if db.is_pumpable():
-                    args = (batch_number, self.total_number_of_batches, lock)
-                    future = executor.submit(db.process_batch, *args)
-                    future_to_batch[future] = batch_number
+
+        for batch_number in range(1, self.total_number_of_batches+1):
+            db = next(db_cycle)
+            if db.is_pumpable():
+                args = (batch_number, self.total_number_of_batches)
+                future = executor.submit(db.process_batch, *args)
+                future_to_batch[future] = batch_number
         result = []
         for future in concurrent.futures.as_completed(future_to_batch):
             batch_number = future_to_batch[future]
@@ -248,9 +247,23 @@ class Host:
             except Exception as exc:
                 print(f"Batch {batch_number} failed: {exc}")
         return result
-    def reboot_and_pump_data(self):
+    def load_dbs(self):
+        self.dbs = self.get_oracle_dbs()
+        self.total_dbs = len(self.dbs)
+    def reboot_and_prepare(self):
         self.reboot()
-        self.execute_pumper()
+        self.log.info('Sleeping 5 mins before querying dbs ')
+        time.sleep(5 * 60)
+        self.load_dbs()
+        self.prepare_pump_eligible_dbs()
+        self.set_pumper_tasks()
+
+    def set_pumper_tasks(self):
+        db_cycle = cycle(self.pumpable_dbs)
+        for _ in range(1, self.total_number_of_batches + 1):
+            db = next(db_cycle)
+            if db.is_pumpable():
+                self.scheduled_dbs.append(db)
 
     def __repr__(self):
         return self.ip
@@ -258,4 +271,4 @@ class Host:
 
 if __name__ == '__main__':
     host_obj = Host('10.14.70.149')
-    host_obj.execute_pumper()
+

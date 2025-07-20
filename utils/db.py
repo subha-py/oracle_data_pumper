@@ -10,6 +10,7 @@ from oracledb.exceptions import DatabaseError, InterfaceError
 import pathlib
 from utils.tables import Table
 from utils.memory import human_read_to_byte
+from threading import Lock
 class DB:
     def __init__(self, db_name, host, username='sys', password='cohesity', type='standalone'):
         self.db_name = db_name
@@ -23,7 +24,7 @@ class DB:
         self.tables = []
         self.fra_limit_set = None
         self.db_files_limit_set = None
-
+        self.lock = Lock()
         self.get_tables()
         self.get_fra_limit()
         self.get_dbfiles_limit()
@@ -135,9 +136,10 @@ class DB:
         self.create_tables()
         return self.is_healthy
 
-    def process_batch(self, batch_number, total_batches, lock):
+    def process_batch(self):
         table_obj = random.choice(self.tables)
-        table_obj.insert_batch(batch_number, total_batches, lock)
+        self.host.curr_number_of_batch += 1
+        table_obj.insert_batch(self.host.curr_number_of_batch, self.host.total_number_of_batches, self.lock)
 
     def __repr__(self):
         return f"{self.host}:{self.db_name}"
