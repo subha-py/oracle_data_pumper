@@ -1,7 +1,8 @@
 #!/u02/oracle_data_pumper/venv/bin/python
 # /etc/systemd/system/pumper-startup.service uses this file in pumper
 import random
-
+import sys
+sys.path.append('/u02/oracle_data_pumper')
 from utils.log import set_logger
 import os
 import subprocess
