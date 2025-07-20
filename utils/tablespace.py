@@ -11,11 +11,10 @@ class Tablespace:
         self.random_size = random_size
         self.db = db
         self.table = table
-        self.datafile_basename = self.get_datafile_basename()
         self.datafiles = []
         if not self.is_created():
             self.create()
-
+        self.datafile_basename = self.get_datafile_basename()
 
     def get_datafile_basename(self):
         if self.name is None:
