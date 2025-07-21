@@ -11,6 +11,7 @@ import pathlib
 from utils.tables import Table
 from utils.memory import human_read_to_byte
 from threading import Lock
+import time
 class DB:
     def __init__(self, db_name, host, username='sys', password='cohesity', type='standalone'):
         self.db_name = db_name
@@ -29,11 +30,22 @@ class DB:
         self.get_fra_limit()
         self.get_dbfiles_limit()
 
-    def connect(self):
-        return connect_to_oracle(self.host, self.db_name)
+    def connect(self, max_retries=5, wait_seconds=60):
+        for attempt in range(1, max_retries + 1):
+            try:
+                return connect_to_oracle(self.host, self.db_name)
+            except Exception as e:
+                self.log.info(f"[Attempt {attempt}/{max_retries}] Connection failed: {e}")
+                if attempt < max_retries:
+                    self.log.info(f"Retrying in {wait_seconds} seconds...")
+                    time.sleep(wait_seconds)
+                else:
+                    self.log.info("All retries failed.")
+                    return None
     def is_listener_connectivity_available(self):
         try:
-            self.connection = self.connect()
+            if not self.connection:
+                self.connection = self.connect()
         except Exception as e:
             self.log.fatal(f'Cannot connect to db - {self}')
             self.is_healthy = False
