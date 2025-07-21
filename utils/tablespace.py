@@ -57,6 +57,7 @@ class Tablespace:
         return datafile_size
     def create(self):
         self.name = f"{self.table.name}ts"
+        self.datafile_basename = self.get_datafile_basename()
         if self.autoextend:
             # todo create big tablespace when autotextend is true
             cmd = (f"""create tablespace {self.name} \

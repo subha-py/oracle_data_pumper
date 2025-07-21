@@ -36,7 +36,7 @@ def startup_activities():
     # todo: ship logs to pluto
     hosts = [
         Host('10.14.70.149'),
-        Host('10.14.69.139')
+        Host('10.14.69.164')
     ]
     future_to_hosts = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
@@ -53,6 +53,8 @@ def startup_activities():
             except Exception as exc:
                 print(f"Batch {host} failed: {exc}")
     # at this point all pumpable dbs are prepared
+    # host = hosts[0]
+    # host.reboot_and_prepare()
     all_scheduled_dbs = []
 
     for host in hosts:

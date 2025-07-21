@@ -49,6 +49,7 @@ class Host:
                 self.log.info(f"{self.ip} is reachable.")
                 return
             time.sleep(5)
+        self.log.info('Marking host as unhealthy - it is not pingable')
         self.is_healthy = False
     def reboot(self):
         if self.is_healthy:
@@ -78,6 +79,7 @@ class Host:
 
             else:
                 self.log.warning(f"VM with IP {self.ip} not found.")
+                self.log.info('Marking host as unhealthy - cannot find it in vc')
                 self.is_healthy = False
 
     def exec_cmds(self, commands, key=None, timeout=5 * 60):
@@ -223,9 +225,13 @@ class Host:
         mount_points = ['/u02', '/']
         result = self.get_disk_usage_multiple_in_gbs(mount_points)
         self.log.info(f'current space usage of {mount_points} -> {result}')
-        if result['/u02'] < 300: #todo: take dynamically from self.pump_size_in_gb
+        u02_limit = 300
+        root_limit = 2
+        if result['/u02'] < u02_limit: #todo: take dynamically from self.pump_size_in_gb
+            self.log.info(f"/u02 have low free memory(got {result['/u02']}), expected (> {u02_limit}) marking this host as unhealthy")
             self.is_healthy = False
-        elif result['/'] < 2:
+        elif result['/'] < root_limit:
+            self.log.info(f"/ have low free memory(got {result['/']}), expected (> {root_limit}) marking this host as unhealthy")
             self.is_healthy = False
         return
     def prepare_pump_eligible_dbs(self):

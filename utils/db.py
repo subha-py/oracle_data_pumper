@@ -18,17 +18,17 @@ class DB:
         self.host = host
         self.username = username
         self.password = password
-        self.connection = self.connect()
         self.log = set_logger(f"{self.host.ip}_{self.db_name}", os.path.join('logs', 'dbs'))
+        self.connection = self.connect()
         self.is_healthy = True
         self.target_table_count = 100
         self.tables = []
         self.fra_limit_set = None
         self.db_files_limit_set = None
         self.lock = Lock()
-        self.get_tables()
         self.get_fra_limit()
         self.get_dbfiles_limit()
+        self.get_tables()
 
     def connect(self, max_retries=5, wait_seconds=60):
         for attempt in range(1, max_retries + 1):
@@ -67,6 +67,9 @@ class DB:
                         return True
                 except Exception as e:
                     self.log.info(f'cannot set query - {query} in {self.host}:{self} got error - {e}')
+                    if 'ORA' in str(e):
+                        self.log.info('Do not need to retry for this error')
+                        return
             if attempt < retries:
                 self.log.info(f"Retrying in {wait} seconds...")
                 time.sleep(wait)
@@ -77,8 +80,12 @@ class DB:
             result = self.run_query("SELECT name,value FROM v$parameter WHERE name='db_recovery_file_dest_size'")[0][1]
             if int(result) >= human_read_to_byte('1024G'):
                 self.fra_limit_set = True
+            else:
+                self.log.fatal('marking db as unhealthy since fra size is < 1024G')
+                self.is_healthy = False
         except IndexError:
-            self.log.info('Cannot get fra limit')
+            self.log.fatal('Cannot get fra limit')
+            self.is_healthy = False
 
     def set_fra_limit(self):
         if not self.fra_limit_set:
@@ -90,19 +97,25 @@ class DB:
             result = self.run_query("select value from v$parameter where name = 'db_files'")[0][0]
             if int(result) >= 1000:
                 self.db_files_limit_set = True
+            else:
+                self.log.fatal('db files limit is less than < 1000, marking db as unhealthy')
+                self.is_healthy = False
+
         except IndexError:
-            self.log.info('Cannot get db files limit')
+            self.log.fatal('Cannot get db files limit')
+            self.is_healthy = False
     def set_db_files_limit(self):
         if not self.db_files_limit_set:
             set_db_files = 'alter system set db_files=20000 scope=spfile'
             self.run_query(set_db_files)
 
     def get_tables(self):
-        query = "SELECT table_name from all_tables WHERE table_name LIKE '%TODOITEM%'"
-        table_names = self.run_query(query)
-        for table in table_names:
-            table_name = table[0]
-            self.tables.append(Table(db=self,name=table_name))
+        if self.is_healthy:
+            query = "SELECT table_name from all_tables WHERE table_name LIKE '%TODOITEM%'"
+            table_names = self.run_query(query)
+            for table in table_names:
+                table_name = table[0]
+                self.tables.append(Table(db=self,name=table_name))
 
 
     def delete_table(self, tablename='todoitem'):
@@ -136,13 +149,14 @@ class DB:
         return result
 
     def create_tables(self):
-        number_of_tables = len(self.tables)
-        if len(self.host.dbs) > 2:
-            self.target_table_count = self.target_table_count//2
-        number_of_tables_to_be_created = max(self.target_table_count - number_of_tables, 0)
-        for i in range(number_of_tables_to_be_created):
-            self.tables.append(Table(db=self))
-        self.log.info(f'Number of tables loaded - {len(self.tables)}')
+        if self.is_healthy:
+            number_of_tables = len(self.tables)
+            if len(self.host.dbs) > 2:
+                self.target_table_count = self.target_table_count//2
+            number_of_tables_to_be_created = max(self.target_table_count - number_of_tables, 0)
+            for i in range(number_of_tables_to_be_created):
+                self.tables.append(Table(db=self))
+            self.log.info(f'Number of tables loaded - {len(self.tables)}')
 
 
 
@@ -156,6 +170,8 @@ class DB:
         self.create_tables()
         if self.is_healthy:
             self.log.info(f'db is healthy - {self} and ready to pump data')
+        else:
+            self.log.info(f'unhealthy db - {self} cannot pump data in this db')
         return self.is_healthy
 
     def process_batch(self):
