@@ -12,7 +12,8 @@ def get_all_vms(content):
     obj_view.Destroy()
     return vms
 
-def find_vm_by_ip(vms, ip):
+def find_vm_by_ip(content, ip):
+    vms = get_all_vms(content)
     for vm in vms:
         try:
             for net in vm.guest.net:

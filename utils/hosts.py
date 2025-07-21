@@ -55,10 +55,20 @@ class Host:
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
-            si = SmartConnect(host='system-test-vc-fitdb.qa01.eng.cohesity.com', user='administrator@vsphere.local', pwd='Cohe$1ty', sslContext=context)
+            vc = 'system-test-vc-fitdb.qa01.eng.cohesity.com'
+            si = SmartConnect(host=vc, user='administrator@vsphere.local', pwd='Cohe$1ty', sslContext=context)
             content = si.RetrieveContent()
-            vms = get_all_vms(content)
-            vm = find_vm_by_ip(vms, self.ip)
+            vm = None
+            MAX_RETRIES = 5
+            RETRY_WAIT = 60  # seconds
+            for attempt in range(1, MAX_RETRIES + 1):
+                self.log.info(f"\n--- Attempt {attempt} - tyring to find vm {self.ip} in vc {vc}---")
+                vm = find_vm_by_ip(content, self.ip)
+                time.sleep(RETRY_WAIT)
+                if vm is not None:
+                    self.log.info(f"\n--- Attempt {attempt} - got vm {self.ip} in vc ---")
+                    break
+                self.log.info(f"\n--- Attempt {attempt} - failed to get vm {self.ip} in vc {vc}---")
             if vm:
                 self.log.info(f"Found VM: {vm.name}")
                 self.vm_name = vm.name
