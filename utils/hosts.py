@@ -232,6 +232,7 @@ class Host:
         # hosts who have enough space
         self.is_space_available()
         if not self.is_healthy:
+            self.log.info('host is not healthy, exiting')
             return
         for db in self.dbs:
             if db.is_pumpable():
@@ -258,22 +259,24 @@ class Host:
                 print(f"Batch {batch_number} failed: {exc}")
         return result
     def load_dbs(self):
+        self.log.info('Trying to get dbs from hosts')
         self.dbs = self.get_oracle_dbs()
         self.total_dbs = len(self.dbs)
+        self.log.info(f'Number of dbs loaded in host - {self.total_dbs}')
     def reboot_and_prepare(self):
         self.reboot()
         self.log.info('Sleeping 5 mins before querying dbs ')
         time.sleep(5 * 60)
         self.load_dbs()
         self.prepare_pump_eligible_dbs()
+        self.log.info(f'Got eligible dbs - {self.pumpable_dbs}')
         self.set_pumper_tasks()
 
     def set_pumper_tasks(self):
         db_cycle = cycle(self.pumpable_dbs)
         for _ in range(1, self.total_number_of_batches + 1):
             db = next(db_cycle)
-            if db.is_pumpable():
-                self.scheduled_dbs.append(db)
+            self.scheduled_dbs.append(db)
 
     def __repr__(self):
         return self.ip

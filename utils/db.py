@@ -51,19 +51,26 @@ class DB:
             self.is_healthy = False
 
     def run_query(self, query):
-        with self.connection.cursor() as cursor:
-            try:
-                cursor.execute(query)
-                result = cursor.fetchall()
-                self.log.info(f'query - {query} successfully executed - {self}')
-                return result
-            except InterfaceError as e:
-                if 'the executed statement does not return rows' in str(e):
-                    self.log.info(f'query executed successfully - {query}')
-                    return True
-            except Exception as e:
-                self.log.info(f'cannot set query - {query} in {self.host}:{self} got error - {e}')
-                return []
+        retries = 5
+        wait = 60
+        for attempt in range(1, retries+1):
+            self.log.info(f"\n--- Attempt {attempt} - running query {query} in  {self} ---")
+            with self.connection.cursor() as cursor:
+                try:
+                    cursor.execute(query)
+                    result = cursor.fetchall()
+                    self.log.info(f'query - {query} successfully executed - {self}')
+                    return result
+                except InterfaceError as e:
+                    if 'the executed statement does not return rows' in str(e):
+                        self.log.info(f'query executed successfully - {query}')
+                        return True
+                except Exception as e:
+                    self.log.info(f'cannot set query - {query} in {self.host}:{self} got error - {e}')
+            if attempt < retries:
+                self.log.info(f"Retrying in {wait} seconds...")
+                time.sleep(wait)
+        return []
 
     def get_fra_limit(self):
         try:
@@ -135,6 +142,7 @@ class DB:
         number_of_tables_to_be_created = max(self.target_table_count - number_of_tables, 0)
         for i in range(number_of_tables_to_be_created):
             self.tables.append(Table(db=self))
+        self.log.info(f'Number of tables loaded - {len(self.tables)}')
 
 
 
@@ -146,6 +154,8 @@ class DB:
         self.set_fra_limit()
         self.set_db_files_limit()
         self.create_tables()
+        if self.is_healthy:
+            self.log.info(f'db is healthy - {self} and ready to pump data')
         return self.is_healthy
 
     def process_batch(self):
