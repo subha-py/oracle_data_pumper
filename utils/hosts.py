@@ -1,3 +1,5 @@
+import sys
+sys.path.append('/Users/subha.bera/PycharmProjects/oracle_data_pumper')
 import paramiko
 import time
 import os
@@ -27,13 +29,11 @@ class Host:
         self.timeout = 10*60
         self.is_healthy = True
         self.pumpable_dbs = []
-        self.num_workers = 10
         self.pump_size_in_gb = '100G'
         self.batch_size = 10000
         self.total_rows_required = get_number_of_rows_from_file_size(self.pump_size_in_gb)
         self.total_number_of_batches = self.total_rows_required // self.batch_size
         self.dbs = []
-        self.total_dbs = 0
         self.curr_number_of_batch = 0
         self.scheduled_dbs = []
     def ping(self):
@@ -197,8 +197,11 @@ class Host:
         return results
 
     def get_oracle_dbs(self, oratab_path='/etc/oratab'):
+        if not self.is_healthy:
+            return []
         oracle_dbs = []
         sid = None
+        self.log.info('Trying to get dbs from hosts')
         try:
             command = f"grep -v '^#' {oratab_path} | grep -v '^$'"
             stdout, stderr = self.exec_cmds([command])
@@ -211,15 +214,16 @@ class Host:
                 if len(parts) >= 2:
                     sid = parts[0].strip().upper()
                 try:
+                    if 'multi' in sid:
+                        continue
                     oracle_dbs.append(DB(sid, self))
                 except Exception as e:
                     self.log.fatal(f'Cannot create db object for - db - {sid} due to {e}')
-            return oracle_dbs
+            self.dbs = oracle_dbs
 
         except Exception as e:
             self.log.fatal(f"Failed to fetch Oracle DBs: {e}")
             self.is_healthy = False
-            return []
 
     def is_space_available(self):
         mount_points = ['/u02', '/']
@@ -237,6 +241,7 @@ class Host:
     def prepare_pump_eligible_dbs(self):
         # hosts who have enough space
         self.is_space_available()
+        self.get_oracle_dbs()
         if not self.is_healthy:
             self.log.info('host is not healthy, exiting')
             return
@@ -251,8 +256,7 @@ class Host:
         for batch_number in range(1, self.total_number_of_batches+1):
             db = next(db_cycle)
             if db.is_pumpable():
-                args = (batch_number, self.total_number_of_batches)
-                future = executor.submit(db.process_batch, *args)
+                future = executor.submit(db.process_batch)
                 future_to_batch[future] = batch_number
         result = []
         for future in concurrent.futures.as_completed(future_to_batch):
@@ -264,30 +268,33 @@ class Host:
             except Exception as exc:
                 print(f"Batch {batch_number} failed: {exc}")
         return result
-    def load_dbs(self):
-        self.log.info('Trying to get dbs from hosts')
-        self.dbs = self.get_oracle_dbs()
-        self.total_dbs = len(self.dbs)
-        self.log.info(f'Number of dbs loaded in host - {self.total_dbs}')
+
+
     def reboot_and_prepare(self):
-        self.reboot()
-        self.log.info('Sleeping 5 mins before querying dbs ')
-        time.sleep(5 * 60)
-        self.load_dbs()
+        # self.reboot()
+        # self.log.info('Sleeping 5 mins before querying dbs ')
+        # time.sleep(5 * 60)
+        # todo uncomment me
         self.prepare_pump_eligible_dbs()
-        self.log.info(f'Got eligible dbs - {self.pumpable_dbs}')
         self.set_pumper_tasks()
 
     def set_pumper_tasks(self):
-        db_cycle = cycle(self.pumpable_dbs)
-        for _ in range(1, self.total_number_of_batches + 1):
-            db = next(db_cycle)
-            self.scheduled_dbs.append(db)
+        if self.is_healthy:
+            self.log.info(f'Got eligible dbs - {self.pumpable_dbs}')
+            if self.pumpable_dbs:
+                db_cycle = cycle(self.pumpable_dbs)
+                for _ in range(1, self.total_number_of_batches + 1):
+                    db = next(db_cycle)
+                    self.scheduled_dbs.append(db)
 
     def __repr__(self):
         return self.ip
 
 
 if __name__ == '__main__':
-    host_obj = Host('10.14.70.149')
+    host_obj = Host('10.3.63.220')
+    host_obj.reboot_and_prepare()
+    if host_obj.pumpable_dbs:
+        db = host_obj.pumpable_dbs[0]
+        db.process_batch()
 

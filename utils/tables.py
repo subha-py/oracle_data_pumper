@@ -6,6 +6,7 @@ from utils.memory import (
     get_databse_size
 )
 from oracledb.exceptions import DatabaseError
+from oracledb import DB_TYPE_NUMBER, DB_TYPE_VARCHAR, DB_TYPE_BOOLEAN
 import os
 import random
 import string
@@ -15,12 +16,14 @@ import datetime
 import pathlib
 from utils.tablespace import Tablespace
 from string import ascii_letters
+from memory_profiler import profile, memory_usage
+
 class Table:
     def __init__(self, db, name=None):
         self.name = name
         self.tablespace = None
         self.db = db
-        self.batch_size = 10000
+        self.batch_size = self.db.host.batch_size
         self.random_size = False
         if self.is_created():
             # when table is already present no need to create a new one
@@ -76,12 +79,14 @@ class Table:
 
 
 
+
     def insert_batch(self, batch_number, number_of_batches, lock, rows=None):
         rows = []
         for i in range(self.batch_size):
             rows.append(self.create_row())
         self.db.log.info(f"inserting into {self.name}: batch_number: {batch_number}/{number_of_batches}")
         with self.db.connection.cursor() as cursor:
+            cursor.setinputsizes(24, DB_TYPE_BOOLEAN, DB_TYPE_NUMBER, 10)
             try:
                 cursor.executemany(f"insert into {self.name} (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
             except DatabaseError as e:
@@ -137,7 +142,9 @@ class Table:
                                 return
 
         self.db.connection.commit()
-        self.db.log.info(f'Committed batch number - :{batch_number}/{number_of_batches}')
+        del rows
+        self.db.log.info(f'{self.db}-{self}-Committed batch number - :{batch_number}/{number_of_batches}, going to sleep for 60 secs')
+        time.sleep(60)
         return
 
 
@@ -265,4 +272,3 @@ def create_todo_item_table(connection, db_name, datafile_size,
             create_single_todoitem_table(connection, db_name, tablename, tablespace_name, datafile_size, autoextend)
     else:
         print("Tables already exist. Skipping creation.")
-

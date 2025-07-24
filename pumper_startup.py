@@ -11,6 +11,7 @@ import logging
 import concurrent.futures
 from utils.hosts import Host
 from itertools import cycle
+from memory_profiler import profile
 
 def pull_latest_code(repo_path="."):
     logger = logging.getLogger(os.environ.get("log_file_name"))
@@ -25,6 +26,7 @@ def pull_latest_code(repo_path="."):
     logger.info("Git pull successful!")
     return result
 
+
 def startup_activities():
     # set_logger('pumper_startup_logger')
     # pull_latest_code()
@@ -35,8 +37,9 @@ def startup_activities():
     # todo: create a new report in html after each run
     # todo: ship logs to pluto
     hosts = [
-        Host('10.14.70.149'),
-        Host('10.14.69.164')
+        Host('10.3.63.220'),
+        Host('10.3.63.223'),
+        Host('10.14.69.164'),
     ]
     future_to_hosts = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
@@ -62,7 +65,7 @@ def startup_activities():
     random.shuffle(all_scheduled_dbs)
     future_to_dbs = {}
     result = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=128) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
         for db in all_scheduled_dbs:
                 future = executor.submit(db.process_batch)
                 future_to_dbs[future] = str(db)

@@ -13,4 +13,4 @@ def connect_to_oracle(host, db_name, user='sys', password='cohesity'):
 
 
 if __name__ == '__main__':
-    conn = connect_to_oracle('10.14.70.149', 'bctstat')
+    conn = connect_to_oracle('10.131.37.83', 'FIDB0')

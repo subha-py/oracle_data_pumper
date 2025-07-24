@@ -1,3 +1,4 @@
+
 from utils.ssh import execute_commands_on_host
 from collections import defaultdict
 from utils.connection import connect_to_oracle
@@ -12,6 +13,7 @@ from utils.tables import Table
 from utils.memory import human_read_to_byte
 from threading import Lock
 import time
+from memory_profiler import profile, memory_usage
 class DB:
     def __init__(self, db_name, host, username='sys', password='cohesity', type='standalone'):
         self.db_name = db_name
@@ -21,7 +23,7 @@ class DB:
         self.log = set_logger(f"{self.host.ip}_{self.db_name}", os.path.join('logs', 'dbs'))
         self.connection = self.connect()
         self.is_healthy = True
-        self.target_table_count = 100
+        self.target_table_count = 25
         self.tables = []
         self.fra_limit_set = None
         self.db_files_limit_set = None
@@ -88,7 +90,7 @@ class DB:
             self.is_healthy = False
 
     def set_fra_limit(self):
-        if not self.fra_limit_set:
+        if not self.fra_limit_set and self.is_healthy:
             set_recovery_file_dest_size = 'alter system set db_recovery_file_dest_size=2000G scope=both'
             self.run_query(set_recovery_file_dest_size)
 
@@ -105,7 +107,7 @@ class DB:
             self.log.fatal('Cannot get db files limit')
             self.is_healthy = False
     def set_db_files_limit(self):
-        if not self.db_files_limit_set:
+        if not self.db_files_limit_set and self.is_healthy:
             set_db_files = 'alter system set db_files=20000 scope=spfile'
             self.run_query(set_db_files)
 
@@ -174,6 +176,7 @@ class DB:
             self.log.info(f'unhealthy db - {self} cannot pump data in this db')
         return self.is_healthy
 
+    # @profile
     def process_batch(self):
         table_obj = random.choice(self.tables)
         self.host.curr_number_of_batch += 1
