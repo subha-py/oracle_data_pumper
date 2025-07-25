@@ -140,11 +140,22 @@ class Table:
                                 # go to recursion
                                 self.insert_batch(batch_number, number_of_batches, lock, rows)
                                 return
+                elif 'the database or network closed the connection' in str(e):
+                    self.db.log.info('This happens when there is a connection error between db and pumper')
+                    self.db.log.info(f'db is marked unhealthy, because {e}')
+                    self.db.is_healthy = False
 
-        self.db.connection.commit()
+        try:
+            if self.db.is_healthy:
+                self.db.connection.commit()
+        except AttributeError as e:
+            self.db.log.info('This happens when db is shutdown while pumper is running')
+            self.db.log.info('cannot commit this transaction, will mark this db as unhealthy')
+            self.db.is_healthy = False
         del rows
-        self.db.log.info(f'{self.db}-{self}-Committed batch number - :{batch_number}/{number_of_batches}, going to sleep for 60 secs')
-        time.sleep(60)
+        if self.db.is_healthy:
+            self.db.log.info(f'{self.db}-{self}-Committed batch number - :{batch_number}/{number_of_batches}, going to sleep for 60 secs')
+            time.sleep(60)
         return
 
 

@@ -271,10 +271,9 @@ class Host:
 
 
     def reboot_and_prepare(self):
-        # self.reboot()
-        # self.log.info('Sleeping 5 mins before querying dbs ')
-        # time.sleep(5 * 60)
-        # todo uncomment me
+        self.reboot()
+        self.log.info('Sleeping 5 mins before querying dbs ')
+        time.sleep(5 * 60)
         self.prepare_pump_eligible_dbs()
         self.set_pumper_tasks()
 
@@ -296,5 +295,6 @@ if __name__ == '__main__':
     host_obj.reboot_and_prepare()
     if host_obj.pumpable_dbs:
         db = host_obj.pumpable_dbs[0]
-        db.process_batch()
+        for i in range(10):
+            db.process_batch()
 
