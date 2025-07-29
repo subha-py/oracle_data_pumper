@@ -1,20 +1,14 @@
 import sys
 sys.path.append('/Users/subha.bera/PycharmProjects/oracle_data_pumper')
 import paramiko
-import time
-import os
 from pyVim.connect import SmartConnect, Disconnect
-from pyVmomi import vim
 import ssl
 import time
 import subprocess
-from pyVim.task import WaitForTasks
-import logging
-import os
 from utils.db import DB
 
 from utils.log import set_logger
-from utils.vmware import get_all_vms, find_vm_by_ip, reboot_vm
+from utils.vmware import find_vm_by_ip, reboot_vm
 from utils.memory import get_number_of_rows_from_file_size
 from itertools import cycle
 
@@ -29,7 +23,7 @@ class Host:
         self.timeout = 10*60
         self.is_healthy = True
         self.pumpable_dbs = []
-        self.pump_size_in_gb = '100M'
+        self.pump_size_in_gb = '100G'
         self.batch_size = 10000
         self.total_rows_required = get_number_of_rows_from_file_size(self.pump_size_in_gb)
         self.total_number_of_batches = self.total_rows_required // self.batch_size
@@ -272,9 +266,9 @@ class Host:
 
 
     def reboot_and_prepare(self):
-        # self.reboot()
-        # self.log.info('Sleeping 5 mins before querying dbs ')
-        # time.sleep(5 * 60)
+        self.reboot()
+        self.log.info('Sleeping 5 mins before querying dbs ')
+        time.sleep(5 * 60)
         self.prepare_pump_eligible_dbs()
         self.set_pumper_tasks()
 

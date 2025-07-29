@@ -4,7 +4,6 @@ import sys
 import datetime
 import paramiko
 from scp import SCPClient
-# Get the directory where the script is located
 def create_log_dir():
     if not os.environ.get('log_dir'):
         script_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))

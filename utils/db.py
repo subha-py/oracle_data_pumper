@@ -1,19 +1,14 @@
 
-from utils.ssh import execute_commands_on_host
-from collections import defaultdict
 from utils.connection import connect_to_oracle
-import logging
 import os
 from utils.log import set_logger
 import random
-import sys
 from oracledb.exceptions import DatabaseError, InterfaceError
 import pathlib
 from utils.tables import Table
 from utils.memory import human_read_to_byte
 from threading import Lock
 import time
-from memory_profiler import profile, memory_usage
 class DB:
     def __init__(self, db_name, host, username='sys', password='cohesity', type='standalone'):
         self.db_name = db_name

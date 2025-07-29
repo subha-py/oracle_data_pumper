@@ -1,12 +1,6 @@
-from utils.memory import (
-    human_read_to_byte,
-    get_number_of_rows_from_file_size,
-    set_recovery_file_dest_size,
-    bytes_to_human_read,
-    get_databse_size
-)
+from utils.memory import set_recovery_file_dest_size
 from oracledb.exceptions import DatabaseError
-from oracledb import DB_TYPE_NUMBER, DB_TYPE_VARCHAR, DB_TYPE_BOOLEAN
+from oracledb import DB_TYPE_NUMBER, DB_TYPE_BOOLEAN
 import os
 import random
 import string
@@ -16,7 +10,6 @@ import datetime
 import pathlib
 from utils.tablespace import Tablespace
 from string import ascii_letters
-from memory_profiler import profile, memory_usage
 
 class Table:
     def __init__(self, db, name=None):

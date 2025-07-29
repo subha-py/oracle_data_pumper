@@ -1,6 +1,5 @@
 #!/u02/oracle_data_pumper/venv/bin/python
 # /etc/systemd/system/pumper-startup.service uses this file in pumper
-import datetime
 import random
 import sys
 sys.path.append('/u02/oracle_data_pumper')
@@ -10,9 +9,6 @@ import subprocess
 from utils.cohesity import get_registered_sources, get_cluster_name
 import logging
 import concurrent.futures
-from utils.hosts import Host
-from itertools import cycle
-from memory_profiler import profile
 
 def pull_latest_code(repo_path="."):
     logger = logging.getLogger(os.environ.get("log_file_name"))
@@ -41,7 +37,10 @@ def startup_activities():
     # todo: remove rac from this list - should have rac in its name
     # todo: datapump in pdbs - should have cdb in its name
     # todo: bigtablespace autoextend -> the db name should have big in its name
-
+    # todo: add install agent if required
+    # todo: put services file in host if required
+    # todo: change oratab entries
+    # todo: mark unhealthy if oradata is missing
     future_to_hosts = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
         for host in hosts:
