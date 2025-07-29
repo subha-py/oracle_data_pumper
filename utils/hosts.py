@@ -14,11 +14,13 @@ from itertools import cycle
 
 import concurrent.futures
 class Host:
-    def __init__(self, ip, vm_name=None, username='oracle', password='cohesity'):
+    def __init__(self, ip, vm_name=None, username='oracle', password='cohesity', root_username='root', root_password='root' ):
         self.ip = ip
         self.vm_name = vm_name
         self.username = username
         self.password = password
+        self.root_username = root_username
+        self.root_password = root_password
         self.log = set_logger(self.ip, 'hosts')
         self.timeout = 10*60
         self.is_healthy = True
@@ -31,6 +33,7 @@ class Host:
         self.curr_number_of_batch = 0
         self.failed_number_of_batch = 0
         self.scheduled_dbs = []
+        self.services = ['oracle-database.service', 'oracle-listener.service']
     def ping(self):
         try:
             subprocess.check_output(['ping', '-c', '1', '-W', '1', self.ip], stderr=subprocess.DEVNULL)
@@ -77,15 +80,15 @@ class Host:
                 self.log.info('Marking host as unhealthy - cannot find it in vc')
                 self.is_healthy = False
 
-    def exec_cmds(self, commands, key=None, timeout=5 * 60):
+    def exec_cmds(self, commands, username=None, password=None, key=None, timeout=5 * 60, MAX_RETRIES=5, RETRY_WAIT=60):
         if not self.is_healthy:
             self.log.info(f"Host {self.ip} is marked unhealthy. Skipping execution.")
             return None, None
-
-        MAX_RETRIES = 5
-        RETRY_WAIT = 60  # seconds
         stdout_output, stderr_output = None, None
-
+        if username is None:
+            username = self.username
+        if password is None:
+            password = self.password
         for attempt in range(1, MAX_RETRIES + 1):
             ssh_client = paramiko.SSHClient()
             ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -93,9 +96,9 @@ class Host:
 
             try:
                 if key:
-                    ssh_client.connect(hostname=self.ip, username=self.username, pkey=key, timeout=timeout)
+                    ssh_client.connect(hostname=self.ip, username=username, pkey=key, timeout=timeout)
                 else:
-                    ssh_client.connect(hostname=self.ip, username=self.username, password=self.password, timeout=timeout)
+                    ssh_client.connect(hostname=self.ip, username=username, password=password, timeout=timeout)
 
                 self.log.info(f"Successfully connected to {self.ip}")
 
@@ -123,7 +126,7 @@ class Host:
                 return stdout_output, stderr_output  # Success: return on first full execution
 
             except paramiko.AuthenticationException:
-                self.log.info(f"Authentication failed for {self.username}@{self.ip}. Please check credentials.")
+                self.log.info(f"Authentication failed for {username}@{self.ip}. Please check credentials.")
                 self.is_healthy = False
                 break
             except (paramiko.SSHException, paramiko.BadHostKeyException) as ssh_err:
@@ -264,8 +267,29 @@ class Host:
                 print(f"Batch {batch_number} failed: {exc}")
         return result
 
+    def is_service_running(self,service_name):
+        command = f"systemctl is-active {service_name}"
+        status, err = self.exec_cmds([command], username=self.root_username, password=self.root_password, MAX_RETRIES=1)
+        if status == 'active':
+            return True
+        else:
+            return False
 
+    def set_service(self, service_name):
+        if not self.is_service_running(service_name):
+            commands = [f'wget https://sv4-pluto.eng.cohesity.com/bugs/sbera_backups/services/{service_name} -O /etc/systemd/system/{service_name}',
+                'sudo systemctl daemon-reexec', 'sudo systemctl daemon-reload', f'sudo systemctl enable {service_name}',
+                f'sudo systemctl start {service_name}',f'sudo systemctl status {service_name}']
+            self.exec_cmds(commands, username=self.root_username, password=self.root_password, MAX_RETRIES=1)
+    def prepare_services(self):
+        for service in self.services:
+            self.set_service(service)
+    def change_oratab_entries(self):
+        oratab_commands = [r"sudo sed -i 's/^\([^#][^:]*:[^:]*:\)N/\1Y/' /etc/oratab"]
+        self.exec_cmds(oratab_commands)
     def reboot_and_prepare(self):
+        self.prepare_services()
+        self.change_oratab_entries()
         self.reboot()
         self.log.info('Sleeping 5 mins before querying dbs ')
         time.sleep(5 * 60)
@@ -286,10 +310,5 @@ class Host:
 
 
 if __name__ == '__main__':
-    host_obj = Host('10.3.63.220')
+    host_obj = Host('10.131.37.84')
     host_obj.reboot_and_prepare()
-    if host_obj.pumpable_dbs:
-        db = host_obj.pumpable_dbs[0]
-        for i in range(10):
-            db.process_batch()
-

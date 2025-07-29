@@ -38,8 +38,6 @@ def startup_activities():
     # todo: datapump in pdbs - should have cdb in its name
     # todo: bigtablespace autoextend -> the db name should have big in its name
     # todo: add install agent if required
-    # todo: put services file in host if required
-    # todo: change oratab entries
     # todo: mark unhealthy if oradata is missing
     future_to_hosts = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
