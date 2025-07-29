@@ -9,7 +9,7 @@ import subprocess
 from utils.cohesity import get_registered_sources, get_cluster_name
 import logging
 import concurrent.futures
-
+import argparse
 def pull_latest_code(repo_path="."):
     logger = logging.getLogger(os.environ.get("log_file_name"))
     logger.info(f"Attempting to pull latest code in: {os.path.abspath(repo_path)}")
@@ -30,9 +30,8 @@ def dump_logs_to_pluto(cluster_ip, logdir=None):
         remote_user="cohesity", remote_path=f"/home/cohesity/data/bugs/sbera_backups/oracle_pumper_dumps/{cluster_name}", password="fr8shst8rt"
     )
 
-def startup_activities():
+def startup_activities(cluster_ip):
     pull_latest_code()
-    cluster_ip = '10.14.7.1'
     hosts = get_registered_sources(cluster_ip=cluster_ip)
     # todo: remove rac from this list - should have rac in its name
     # todo: datapump in pdbs - should have cdb in its name
@@ -54,8 +53,6 @@ def startup_activities():
             except Exception as exc:
                 print(f"Batch {host} failed: {exc}")
     # at this point all pumpable dbs are prepared
-    # host = hosts[0]
-    # host.reboot_and_prepare()
     all_scheduled_dbs = []
 
     for host in hosts:
@@ -83,4 +80,11 @@ def startup_activities():
 
 
 if __name__ == '__main__':
-    startup_activities()
+    parser = argparse.ArgumentParser(description='Program to pump data in oracle sources registered in cluster')
+    parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
+    optional = parser.add_argument_group('optional arguments')
+
+    required.add_argument('--clusterip', help='ip/hostname of the db', type=str, required=True)
+    result = parser.parse_args()
+    startup_activities(result.clusterip)
