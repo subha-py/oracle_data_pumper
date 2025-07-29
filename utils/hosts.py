@@ -25,16 +25,17 @@ class Host:
         self.vm_name = vm_name
         self.username = username
         self.password = password
-        self.log = set_logger(self.ip, os.path.join('logs', 'hosts'))
+        self.log = set_logger(self.ip, 'hosts')
         self.timeout = 10*60
         self.is_healthy = True
         self.pumpable_dbs = []
-        self.pump_size_in_gb = '100G'
+        self.pump_size_in_gb = '100M'
         self.batch_size = 10000
         self.total_rows_required = get_number_of_rows_from_file_size(self.pump_size_in_gb)
         self.total_number_of_batches = self.total_rows_required // self.batch_size
         self.dbs = []
         self.curr_number_of_batch = 0
+        self.failed_number_of_batch = 0
         self.scheduled_dbs = []
     def ping(self):
         try:
@@ -271,9 +272,9 @@ class Host:
 
 
     def reboot_and_prepare(self):
-        self.reboot()
-        self.log.info('Sleeping 5 mins before querying dbs ')
-        time.sleep(5 * 60)
+        # self.reboot()
+        # self.log.info('Sleeping 5 mins before querying dbs ')
+        # time.sleep(5 * 60)
         self.prepare_pump_eligible_dbs()
         self.set_pumper_tasks()
 

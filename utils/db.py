@@ -20,7 +20,7 @@ class DB:
         self.host = host
         self.username = username
         self.password = password
-        self.log = set_logger(f"{self.host.ip}_{self.db_name}", os.path.join('logs', 'dbs'))
+        self.log = set_logger(f"{self.host.ip}_{self.db_name}", 'dbs')
         self.is_healthy = True
         self.connection = self.connect()
         self.target_table_count = 25
@@ -196,7 +196,7 @@ class DB:
             table_obj.insert_batch(self.host.curr_number_of_batch, self.host.total_number_of_batches, self.lock)
         else:
             self.log.info('db is not healthy skipping transaction')
-
+            self.host.failed_number_of_batch += 1
     def __repr__(self):
         return f"{self.host}:{self.db_name}"
 

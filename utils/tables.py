@@ -81,9 +81,10 @@ class Table:
 
 
     def insert_batch(self, batch_number, number_of_batches, lock, rows=None):
-        rows = []
-        for i in range(self.batch_size):
-            rows.append(self.create_row())
+        if rows is None:
+            rows = []
+            for i in range(self.batch_size):
+                rows.append(self.create_row())
         self.db.log.info(f"inserting into {self.name}: batch_number: {batch_number}/{number_of_batches}")
         with self.db.connection.cursor() as cursor:
             cursor.setinputsizes(24, DB_TYPE_BOOLEAN, DB_TYPE_NUMBER, 10)
@@ -144,6 +145,7 @@ class Table:
                     self.db.log.info('This happens when there is a connection error between db and pumper')
                     self.db.log.info(f'db is marked unhealthy, because {e}')
                     self.db.is_healthy = False
+                    self.db.host.failed_number_of_batch += 1
 
         try:
             if self.db.is_healthy:
@@ -152,10 +154,12 @@ class Table:
             self.db.log.info('This happens when db is shutdown while pumper is running')
             self.db.log.info('cannot commit this transaction, will mark this db as unhealthy')
             self.db.is_healthy = False
+            self.db.host.failed_number_of_batch += 1
         del rows
         if self.db.is_healthy:
-            self.db.log.info(f'{self.db}-{self}-Committed batch number - :{batch_number}/{number_of_batches}, going to sleep for 60 secs')
-            time.sleep(60)
+            sleep_time = random.randint(5,10)
+            self.db.log.info(f'{self.db}-{self}-Committed batch number - :{batch_number}/{number_of_batches}, going to sleep for {sleep_time} secs')
+            time.sleep(sleep_time)
         return
 
 

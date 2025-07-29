@@ -72,7 +72,6 @@ def setup_cluster_automation_variables_in_environment(cluster_ip, username="admi
     get_node_ips(cluster_ip)
 
 def get_registered_sources(cluster_ip,source_type='oracle'):
-    logger = logging.getLogger(os.environ.get("log_file_name"))
     setup_cluster_automation_variables_in_environment(cluster_ip)
     ips = os.environ.get("node_ips").split(",")
     ip = random.choice(ips)
@@ -84,5 +83,16 @@ def get_registered_sources(cluster_ip,source_type='oracle'):
         env = registrationInfo.get('environments')
         if env is not None and source_type in env[0].lower() and 'linux' in source['rootNode']['physicalProtectionSource']['osName'].lower():
                 result.append(Host(ip=registrationInfo['accessInfo']['endpoint']))
-    logger.info(f'cluster ip - {cluster_ip}\n \noracle sources - {result}')
+    print(f'cluster ip - {cluster_ip}\n \noracle sources - {result}')
     return result
+
+def get_cluster_name(ip):
+    setup_cluster_automation_variables_in_environment(ip)
+    response = requests.request("GET", "https://{}/v2/clusters?fetchMetadataInfo=true".format(ip), verify=False,
+        headers=get_headers()).json()
+    return response['name']
+if __name__ == '__main__':
+    cluster_ip = '10.2.197.147'
+
+    result = get_cluster_name(cluster_ip)
+    print(result)
