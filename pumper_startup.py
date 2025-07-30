@@ -31,13 +31,13 @@ def dump_logs_to_pluto(cluster_ip, logdir=None):
     )
 
 def startup_activities(cluster_ip):
-    pull_latest_code()
     hosts = get_registered_sources(cluster_ip=cluster_ip)
     # todo: remove rac from this list - should have rac in its name
     # todo: datapump in pdbs - should have cdb in its name
     # todo: bigtablespace autoextend -> the db name should have big in its name
     # todo: add install agent if required
     # todo: mark unhealthy if oradata is missing
+    # todo: do this for windows machine
     future_to_hosts = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
         for host in hosts:

@@ -139,7 +139,12 @@ class Table:
                     self.db.log.info(f'db is marked unhealthy, because {e}')
                     self.db.is_healthy = False
                     self.db.host.failed_number_of_batch += 1
-
+            except Exception as e:
+                if 'object has not attribute' in str(e):
+                    self.db.log.info('This happens when database closes the connection')
+                    self.db.log.info(f'db is marked unhealthy, because {e}')
+                    self.db.is_healthy = False
+                    self.db.host.failed_number_of_batch += 1
         try:
             if self.db.is_healthy:
                 self.db.connection.commit()

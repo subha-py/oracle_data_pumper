@@ -76,6 +76,10 @@ class DB:
                     if 'ORA' in str(e):
                         self.log.info('Do not need to retry for this error')
                         return
+                    if 'DPY-4011' in str(e):
+                        self.log.info(f'Db connection got closed with - {e}')
+                        self.is_healthy = False
+                        return
             if attempt < retries:
                 self.log.info(f"Retrying in {wait} seconds...")
                 time.sleep(wait)
