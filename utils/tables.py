@@ -150,7 +150,7 @@ class Table:
             self.db.host.failed_number_of_batch += 1
         del rows
         if self.db.is_healthy:
-            sleep_time = random.randint(5,10)
+            sleep_time = random.randint(1,5)
             self.db.log.info(f'{self.db}-{self}-Committed batch number - :{batch_number}/{number_of_batches}, going to sleep for {sleep_time} secs')
             time.sleep(sleep_time)
         return
