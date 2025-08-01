@@ -3,7 +3,8 @@
 import random
 import sys
 sys.path.append('/u02/oracle_data_pumper')
-from utils.log import create_report, scp_to_remote
+from utils.log import scp_to_remote
+from utils.reports import create_report
 import os
 import subprocess
 from utils.cohesity import get_registered_sources, get_cluster_name
@@ -73,7 +74,7 @@ def startup_activities(cluster_ip):
             except Exception as exc:
                 print(f"Batch {db} failed: {exc}")
 
-    create_report(hosts)
+    create_report(hosts, cluster_ip)
     dump_logs_to_pluto(cluster_ip)
     return result
 

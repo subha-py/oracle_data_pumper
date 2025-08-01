@@ -40,65 +40,6 @@ def set_logger(log_file_name, dir=None):
     logger.addHandler(console_handler)
     return logger
 
-def create_report(hosts):
-    def status_color(db):
-        return 'green' if db.is_healthy else 'red'
-    def status_health(db):
-        return 'healthy' if db.is_healthy else 'unhealthy'
-
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Database Health Report</title>
-        <style>
-            body {{
-                font-family: Arial, sans-serif;
-                padding: 20px;
-            }}
-            h2 {{
-                color: #333;
-            }}
-            table {{
-                border-collapse: collapse;
-                width: 50%;
-                margin-bottom: 30px;
-            }}
-            th, td {{
-                border: 1px solid #ccc;
-                padding: 8px 12px;
-                text-align: left;
-            }}
-            th {{
-                background-color: #f2f2f2;
-            }}
-        </style>
-    </head>
-    <body>
-        <h1>Database Health Report</h1>
-        <p>Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-    """
-
-    for host in hosts:
-        dbs = host.dbs
-        html += f"<h2>{host}</h2>\n"
-        html += "<table>\n<tr><th>Database</th><th>Health Status</th></tr>\n"
-        for db in dbs:
-            color = status_color(db)
-            status = status_health(db)
-            html += f"<tr><td>{db}</td><td style='color:{color}; font-weight:bold'>{status}</td></tr>\n"
-        html += "</table>\n"
-
-    html += "</body>\n</html>"
-    log_dir = os.environ.get('log_dir')
-    reports_file = os.path.join(log_dir, 'db_health_report.html')
-    # Save to file
-    with open(reports_file, "w") as f:
-        f.write(html)
-
-    print("HTML report saved as db_health_report.html")
-
 def scp_to_remote(local_path, remote_host, remote_user, remote_path, password=None, port=22, key_file=None):
     try:
         ssh = paramiko.SSHClient()

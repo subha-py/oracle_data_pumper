@@ -197,7 +197,7 @@ class DB:
             self.log.info('db is not healthy skipping transaction')
             self.host.failed_number_of_batch += 1
     def __repr__(self):
-        return f"{self.host}:{self.db_name}"
+        return f"{self.host}_{self.db_name}"
 
 if __name__ == '__main__':
     dbs = connect_to_oracle('10.131.37.81', 'SBTDB')
