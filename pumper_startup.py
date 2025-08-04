@@ -1,4 +1,4 @@
-#!/u02/oracle_data_pumper/venv/bin/python
+#!/root/oracle_data_pumper/venv/bin/python
 # /etc/systemd/system/pumper-startup.service uses this file in pumper
 import random
 import sys
