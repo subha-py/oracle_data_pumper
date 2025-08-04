@@ -2,7 +2,6 @@
 # /etc/systemd/system/pumper-startup.service uses this file in pumper
 import random
 import sys
-sys.path.append('/u02/oracle_data_pumper')
 from utils.log import scp_to_remote
 from utils.reports import create_report
 import os
