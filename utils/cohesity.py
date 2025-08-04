@@ -5,7 +5,6 @@ import logging
 from utils.hosts import Host
 import time
 def get_node_ips(cluster_ip, username="admin", password="Syst7mt7st", domain="local", access_token=None):
-    logger = logging.getLogger(os.environ.get("log_file_name"))
     headers = {'Content-Type': "application/json", 'accept': "application/json"}
     if not access_token:
         access_token = os.environ.get("accessToken")
@@ -25,10 +24,9 @@ def get_node_ips(cluster_ip, username="admin", password="Syst7mt7st", domain="lo
         return node_ips
 
     else:
-        logger.info("could not get node - ips")
+        print("could not get node - ips")
         return None
 def get_access_token(cluster_ip, username="admin", password="Syst7mt7st", domain="local"):
-    logger = logging.getLogger(os.environ.get("log_file_name"))
     headers = {'Content-Type': "application/json", 'accept': "application/json"}
     data = {
         "password": password,
@@ -41,7 +39,7 @@ def get_access_token(cluster_ip, username="admin", password="Syst7mt7st", domain
         os.environ.setdefault("accessToken", response_data['accessToken'])
         return response_data['accessToken']
     else:
-        logger.info("could not get accesstoken")
+        print("could not get accesstoken")
         return None
 
 def get_access_keys(cluster_ip, username="admin", password="Syst7mt7st", domain="local", access_token=None):
