@@ -3,6 +3,7 @@ import random
 import os
 import logging
 from utils.hosts import Host
+import time
 def get_node_ips(cluster_ip, username="admin", password="Syst7mt7st", domain="local", access_token=None):
     logger = logging.getLogger(os.environ.get("log_file_name"))
     headers = {'Content-Type': "application/json", 'accept': "application/json"}
@@ -87,11 +88,26 @@ def get_registered_sources(cluster_ip,source_type='oracle'):
 
 def get_cluster_name(ip):
     setup_cluster_automation_variables_in_environment(ip)
-    response = requests.request("GET", "https://{}/v2/clusters?fetchMetadataInfo=true".format(ip), verify=False,
-        headers=get_headers()).json()
-    return response['name']
-if __name__ == '__main__':
-    cluster_ip = '10.2.197.147'
+    ips = os.environ.get("node_ips").split(",")
+    headers = get_headers()  # Assuming this function is already defined
+    name = None
+    for attempt in range(5):
+        cluster_ip = random.choice(ips)
+        try:
+            response = requests.get(f"https://{cluster_ip}/v2/clusters?fetchMetadataInfo=true", headers=headers, verify=False, timeout=5)
+            if response.ok:
+                name = response.json().get('name')
+                if name:
+                    return name
+        except Exception as e:
+            print(f"Attempt {attempt + 1}: Error contacting {cluster_ip} - {e}")
 
+        print(f"Attempt {attempt + 1} failed. Retrying...")
+        time.sleep(1.5 * (attempt + 1))  # Optional exponential backoff
+    if name is None:
+        return ip
+
+if __name__ == '__main__':
+    cluster_ip = '10.131.32.2'
     result = get_cluster_name(cluster_ip)
     print(result)
