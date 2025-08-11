@@ -1,41 +1,39 @@
+import sys
+sys.path.append('/Users/subha.bera/PycharmProjects/oracle_data_pumper')
 import paramiko
-import time
-import os
 from pyVim.connect import SmartConnect, Disconnect
-from pyVmomi import vim
 import ssl
 import time
 import subprocess
-from pyVim.task import WaitForTasks
-import logging
-import os
 from utils.db import DB
 
 from utils.log import set_logger
-from utils.vmware import get_all_vms, find_vm_by_ip, reboot_vm
+from utils.vmware import find_vm_by_ip, reboot_vm
 from utils.memory import get_number_of_rows_from_file_size
 from itertools import cycle
 
 import concurrent.futures
 class Host:
-    def __init__(self, ip, vm_name=None, username='oracle', password='cohesity'):
+    def __init__(self, ip, vm_name=None, username='oracle', password='cohesity', root_username='root', root_password='root' ):
         self.ip = ip
         self.vm_name = vm_name
         self.username = username
         self.password = password
-        self.log = set_logger(self.ip, os.path.join('logs', 'hosts'))
+        self.root_username = root_username
+        self.root_password = root_password
+        self.log = set_logger(self.ip, 'hosts')
         self.timeout = 10*60
         self.is_healthy = True
         self.pumpable_dbs = []
-        self.num_workers = 10
         self.pump_size_in_gb = '100G'
         self.batch_size = 10000
         self.total_rows_required = get_number_of_rows_from_file_size(self.pump_size_in_gb)
         self.total_number_of_batches = self.total_rows_required // self.batch_size
         self.dbs = []
-        self.total_dbs = 0
         self.curr_number_of_batch = 0
+        self.failed_number_of_batch = 0
         self.scheduled_dbs = []
+        self.services = ['oracle-database.service', 'oracle-listener.service']
     def ping(self):
         try:
             subprocess.check_output(['ping', '-c', '1', '-W', '1', self.ip], stderr=subprocess.DEVNULL)
@@ -82,15 +80,15 @@ class Host:
                 self.log.info('Marking host as unhealthy - cannot find it in vc')
                 self.is_healthy = False
 
-    def exec_cmds(self, commands, key=None, timeout=5 * 60):
+    def exec_cmds(self, commands, username=None, password=None, key=None, timeout=5 * 60, MAX_RETRIES=5, RETRY_WAIT=60):
         if not self.is_healthy:
             self.log.info(f"Host {self.ip} is marked unhealthy. Skipping execution.")
             return None, None
-
-        MAX_RETRIES = 5
-        RETRY_WAIT = 60  # seconds
         stdout_output, stderr_output = None, None
-
+        if username is None:
+            username = self.username
+        if password is None:
+            password = self.password
         for attempt in range(1, MAX_RETRIES + 1):
             ssh_client = paramiko.SSHClient()
             ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -98,9 +96,9 @@ class Host:
 
             try:
                 if key:
-                    ssh_client.connect(hostname=self.ip, username=self.username, pkey=key, timeout=timeout)
+                    ssh_client.connect(hostname=self.ip, username=username, pkey=key, timeout=timeout)
                 else:
-                    ssh_client.connect(hostname=self.ip, username=self.username, password=self.password, timeout=timeout)
+                    ssh_client.connect(hostname=self.ip, username=username, password=password, timeout=timeout)
 
                 self.log.info(f"Successfully connected to {self.ip}")
 
@@ -128,7 +126,7 @@ class Host:
                 return stdout_output, stderr_output  # Success: return on first full execution
 
             except paramiko.AuthenticationException:
-                self.log.info(f"Authentication failed for {self.username}@{self.ip}. Please check credentials.")
+                self.log.info(f"Authentication failed for {username}@{self.ip}. Please check credentials.")
                 self.is_healthy = False
                 break
             except (paramiko.SSHException, paramiko.BadHostKeyException) as ssh_err:
@@ -197,8 +195,11 @@ class Host:
         return results
 
     def get_oracle_dbs(self, oratab_path='/etc/oratab'):
+        if not self.is_healthy:
+            return []
         oracle_dbs = []
         sid = None
+        self.log.info('Trying to get dbs from hosts')
         try:
             command = f"grep -v '^#' {oratab_path} | grep -v '^$'"
             stdout, stderr = self.exec_cmds([command])
@@ -211,15 +212,16 @@ class Host:
                 if len(parts) >= 2:
                     sid = parts[0].strip().upper()
                 try:
+                    if 'multi' in sid:
+                        continue
                     oracle_dbs.append(DB(sid, self))
                 except Exception as e:
                     self.log.fatal(f'Cannot create db object for - db - {sid} due to {e}')
-            return oracle_dbs
+            self.dbs = oracle_dbs
 
         except Exception as e:
             self.log.fatal(f"Failed to fetch Oracle DBs: {e}")
             self.is_healthy = False
-            return []
 
     def is_space_available(self):
         mount_points = ['/u02', '/']
@@ -237,6 +239,7 @@ class Host:
     def prepare_pump_eligible_dbs(self):
         # hosts who have enough space
         self.is_space_available()
+        self.get_oracle_dbs()
         if not self.is_healthy:
             self.log.info('host is not healthy, exiting')
             return
@@ -251,8 +254,7 @@ class Host:
         for batch_number in range(1, self.total_number_of_batches+1):
             db = next(db_cycle)
             if db.is_pumpable():
-                args = (batch_number, self.total_number_of_batches)
-                future = executor.submit(db.process_batch, *args)
+                future = executor.submit(db.process_batch)
                 future_to_batch[future] = batch_number
         result = []
         for future in concurrent.futures.as_completed(future_to_batch):
@@ -264,30 +266,49 @@ class Host:
             except Exception as exc:
                 print(f"Batch {batch_number} failed: {exc}")
         return result
-    def load_dbs(self):
-        self.log.info('Trying to get dbs from hosts')
-        self.dbs = self.get_oracle_dbs()
-        self.total_dbs = len(self.dbs)
-        self.log.info(f'Number of dbs loaded in host - {self.total_dbs}')
+
+    def is_service_running(self,service_name):
+        command = f"systemctl is-active {service_name}"
+        status, err = self.exec_cmds([command], username=self.root_username, password=self.root_password, MAX_RETRIES=1)
+        if status == 'active':
+            return True
+        else:
+            return False
+
+    def set_service(self, service_name):
+        if not self.is_service_running(service_name):
+            commands = [f'wget https://sv4-pluto.eng.cohesity.com/bugs/sbera_backups/services/{service_name} -O /etc/systemd/system/{service_name}',
+                'sudo systemctl daemon-reexec', 'sudo systemctl daemon-reload', f'sudo systemctl enable {service_name}',
+                f'sudo systemctl start {service_name}',f'sudo systemctl status {service_name}']
+            self.exec_cmds(commands, username=self.root_username, password=self.root_password, MAX_RETRIES=1)
+    def prepare_services(self):
+        for service in self.services:
+            self.set_service(service)
+    def change_oratab_entries(self):
+        oratab_commands = [r"sudo sed -i 's/^\([^#][^:]*:[^:]*:\)N/\1Y/' /etc/oratab"]
+        self.exec_cmds(oratab_commands)
     def reboot_and_prepare(self):
+        self.prepare_services()
+        self.change_oratab_entries()
         self.reboot()
         self.log.info('Sleeping 5 mins before querying dbs ')
         time.sleep(5 * 60)
-        self.load_dbs()
         self.prepare_pump_eligible_dbs()
-        self.log.info(f'Got eligible dbs - {self.pumpable_dbs}')
         self.set_pumper_tasks()
 
     def set_pumper_tasks(self):
-        db_cycle = cycle(self.pumpable_dbs)
-        for _ in range(1, self.total_number_of_batches + 1):
-            db = next(db_cycle)
-            self.scheduled_dbs.append(db)
+        if self.is_healthy:
+            self.log.info(f'Got eligible dbs - {self.pumpable_dbs}')
+            if self.pumpable_dbs:
+                db_cycle = cycle(self.pumpable_dbs)
+                for _ in range(1, self.total_number_of_batches + 1):
+                    db = next(db_cycle)
+                    self.scheduled_dbs.append(db)
 
     def __repr__(self):
         return self.ip
 
 
 if __name__ == '__main__':
-    host_obj = Host('10.14.70.149')
-
+    host_obj = Host('10.131.37.84')
+    host_obj.reboot_and_prepare()

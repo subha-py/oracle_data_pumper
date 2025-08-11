@@ -1,11 +1,6 @@
-from utils.memory import (
-    human_read_to_byte,
-    get_number_of_rows_from_file_size,
-    set_recovery_file_dest_size,
-    bytes_to_human_read,
-    get_databse_size
-)
+from utils.memory import set_recovery_file_dest_size
 from oracledb.exceptions import DatabaseError
+from oracledb import DB_TYPE_NUMBER, DB_TYPE_BOOLEAN
 import os
 import random
 import string
@@ -15,12 +10,13 @@ import datetime
 import pathlib
 from utils.tablespace import Tablespace
 from string import ascii_letters
+
 class Table:
     def __init__(self, db, name=None):
         self.name = name
         self.tablespace = None
         self.db = db
-        self.batch_size = 10000
+        self.batch_size = self.db.host.batch_size
         self.random_size = False
         if self.is_created():
             # when table is already present no need to create a new one
@@ -76,12 +72,15 @@ class Table:
 
 
 
+
     def insert_batch(self, batch_number, number_of_batches, lock, rows=None):
-        rows = []
-        for i in range(self.batch_size):
-            rows.append(self.create_row())
+        if rows is None:
+            rows = []
+            for i in range(self.batch_size):
+                rows.append(self.create_row())
         self.db.log.info(f"inserting into {self.name}: batch_number: {batch_number}/{number_of_batches}")
         with self.db.connection.cursor() as cursor:
+            cursor.setinputsizes(24, DB_TYPE_BOOLEAN, DB_TYPE_NUMBER, 10)
             try:
                 cursor.executemany(f"insert into {self.name} (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
             except DatabaseError as e:
@@ -135,9 +134,30 @@ class Table:
                                 # go to recursion
                                 self.insert_batch(batch_number, number_of_batches, lock, rows)
                                 return
-
-        self.db.connection.commit()
-        self.db.log.info(f'Committed batch number - :{batch_number}/{number_of_batches}')
+                elif 'the database or network closed the connection' in str(e):
+                    self.db.log.info('This happens when there is a connection error between db and pumper')
+                    self.db.log.info(f'db is marked unhealthy, because {e}')
+                    self.db.is_healthy = False
+                    self.db.host.failed_number_of_batch += 1
+            except Exception as e:
+                if 'object has not attribute' in str(e):
+                    self.db.log.info('This happens when database closes the connection')
+                    self.db.log.info(f'db is marked unhealthy, because {e}')
+                    self.db.is_healthy = False
+                    self.db.host.failed_number_of_batch += 1
+        try:
+            if self.db.is_healthy:
+                self.db.connection.commit()
+        except AttributeError as e:
+            self.db.log.info('This happens when db is shutdown while pumper is running')
+            self.db.log.info('cannot commit this transaction, will mark this db as unhealthy')
+            self.db.is_healthy = False
+            self.db.host.failed_number_of_batch += 1
+        del rows
+        if self.db.is_healthy:
+            sleep_time = random.randint(1,5)
+            self.db.log.info(f'{self.db}-{self}-Committed batch number - :{batch_number}/{number_of_batches}, going to sleep for {sleep_time} secs')
+            time.sleep(sleep_time)
         return
 
 
@@ -265,4 +285,3 @@ def create_todo_item_table(connection, db_name, datafile_size,
             create_single_todoitem_table(connection, db_name, tablename, tablespace_name, datafile_size, autoextend)
     else:
         print("Tables already exist. Skipping creation.")
-

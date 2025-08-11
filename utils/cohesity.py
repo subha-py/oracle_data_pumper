@@ -3,9 +3,8 @@ import random
 import os
 import logging
 from utils.hosts import Host
-from collections import defaultdict
+import time
 def get_node_ips(cluster_ip, username="admin", password="Syst7mt7st", domain="local", access_token=None):
-    logger = logging.getLogger(os.environ.get("log_file_name"))
     headers = {'Content-Type': "application/json", 'accept': "application/json"}
     if not access_token:
         access_token = os.environ.get("accessToken")
@@ -25,10 +24,9 @@ def get_node_ips(cluster_ip, username="admin", password="Syst7mt7st", domain="lo
         return node_ips
 
     else:
-        logger.info("could not get node - ips")
+        print("could not get node - ips")
         return None
 def get_access_token(cluster_ip, username="admin", password="Syst7mt7st", domain="local"):
-    logger = logging.getLogger(os.environ.get("log_file_name"))
     headers = {'Content-Type': "application/json", 'accept': "application/json"}
     data = {
         "password": password,
@@ -41,7 +39,7 @@ def get_access_token(cluster_ip, username="admin", password="Syst7mt7st", domain
         os.environ.setdefault("accessToken", response_data['accessToken'])
         return response_data['accessToken']
     else:
-        logger.info("could not get accesstoken")
+        print("could not get accesstoken")
         return None
 
 def get_access_keys(cluster_ip, username="admin", password="Syst7mt7st", domain="local", access_token=None):
@@ -72,7 +70,6 @@ def setup_cluster_automation_variables_in_environment(cluster_ip, username="admi
     get_node_ips(cluster_ip)
 
 def get_registered_sources(cluster_ip,source_type='oracle'):
-    logger = logging.getLogger(os.environ.get("log_file_name"))
     setup_cluster_automation_variables_in_environment(cluster_ip)
     ips = os.environ.get("node_ips").split(",")
     ip = random.choice(ips)
@@ -84,5 +81,31 @@ def get_registered_sources(cluster_ip,source_type='oracle'):
         env = registrationInfo.get('environments')
         if env is not None and source_type in env[0].lower() and 'linux' in source['rootNode']['physicalProtectionSource']['osName'].lower():
                 result.append(Host(ip=registrationInfo['accessInfo']['endpoint']))
-    logger.info(f'cluster ip - {cluster_ip}\n \noracle sources - {result}')
+    print(f'cluster ip - {cluster_ip}\n \noracle sources - {result}')
     return result
+
+def get_cluster_name(ip):
+    setup_cluster_automation_variables_in_environment(ip)
+    ips = os.environ.get("node_ips").split(",")
+    headers = get_headers()  # Assuming this function is already defined
+    name = None
+    for attempt in range(5):
+        cluster_ip = random.choice(ips)
+        try:
+            response = requests.get(f"https://{cluster_ip}/v2/clusters?fetchMetadataInfo=true", headers=headers, verify=False, timeout=5)
+            if response.ok:
+                name = response.json().get('name')
+                if name:
+                    return name
+        except Exception as e:
+            print(f"Attempt {attempt + 1}: Error contacting {cluster_ip} - {e}")
+
+        print(f"Attempt {attempt + 1} failed. Retrying...")
+        time.sleep(1.5 * (attempt + 1))  # Optional exponential backoff
+    if name is None:
+        return ip
+
+if __name__ == '__main__':
+    cluster_ip = '10.131.32.2'
+    result = get_cluster_name(cluster_ip)
+    print(result)

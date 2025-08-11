@@ -1,8 +1,6 @@
-from pyVim.connect import SmartConnect, Disconnect
+
 from pyVmomi import vim
-import ssl
 import time
-import subprocess
 from pyVim.task import WaitForTasks
 import logging
 import os

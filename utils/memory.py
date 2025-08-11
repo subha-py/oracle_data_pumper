@@ -1,8 +1,5 @@
 from oracledb.exceptions import DatabaseError
-from utils.connection import connect_to_oracle
-from utils.ssh import execute_commands_on_host
-import logging
-import os
+
 def human_read_to_byte(size):
     # if no space in between retry
     size_name = ("B", "K", "M", "G", "T", "P", "E", "Z", "Y")

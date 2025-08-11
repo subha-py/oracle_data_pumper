@@ -1,6 +1,5 @@
 import oracledb
-import logging
-import os
+
 def connect_to_oracle(host, db_name, user='sys', password='cohesity'):
     connection = oracledb.connect(
         user=user,
@@ -13,4 +12,4 @@ def connect_to_oracle(host, db_name, user='sys', password='cohesity'):
 
 
 if __name__ == '__main__':
-    conn = connect_to_oracle('10.14.70.149', 'bctstat')
+    conn = connect_to_oracle('10.3.63.220', 'FIDB')

@@ -1,11 +1,8 @@
-from utils.ssh import execute_commands_on_host
-from collections import defaultdict
+
 from utils.connection import connect_to_oracle
-import logging
 import os
 from utils.log import set_logger
 import random
-import sys
 from oracledb.exceptions import DatabaseError, InterfaceError
 import pathlib
 from utils.tables import Table
@@ -18,16 +15,14 @@ class DB:
         self.host = host
         self.username = username
         self.password = password
-        self.log = set_logger(f"{self.host.ip}_{self.db_name}", os.path.join('logs', 'dbs'))
-        self.connection = self.connect()
+        self.log = set_logger(f"{self.host.ip}_{self.db_name}", 'dbs')
         self.is_healthy = True
-        self.target_table_count = 100
+        self.connection = self.connect()
+        self.target_table_count = 25
         self.tables = []
         self.fra_limit_set = None
         self.db_files_limit_set = None
         self.lock = Lock()
-        self.get_fra_limit()
-        self.get_dbfiles_limit()
         self.get_tables()
 
     def connect(self, max_retries=5, wait_seconds=60):
@@ -35,17 +30,28 @@ class DB:
             try:
                 return connect_to_oracle(self.host, self.db_name)
             except Exception as e:
+                if 'not registered with the listener' in str(e):
+                    self.log.info('cannot connect with db')
+                    self.is_healthy = False
+                    return
+                elif 'Listener refused connection' in str(e):
+                    self.log.info('cannot connect with db')
+                    self.is_healthy = False
+                    return
                 self.log.info(f"[Attempt {attempt}/{max_retries}] Connection failed: {e}")
                 if attempt < max_retries:
                     self.log.info(f"Retrying in {wait_seconds} seconds...")
                     time.sleep(wait_seconds)
                 else:
                     self.log.info("All retries failed.")
-                    return None
+                    return
     def is_listener_connectivity_available(self):
         try:
             if not self.connection:
-                self.connection = self.connect()
+                result = self.connect()
+                if result is None:
+                    raise Exception('database connection error')
+                self.connection = result
         except Exception as e:
             self.log.fatal(f'Cannot connect to db - {self}')
             self.is_healthy = False
@@ -70,12 +76,17 @@ class DB:
                     if 'ORA' in str(e):
                         self.log.info('Do not need to retry for this error')
                         return
+                    if 'DPY-4011' in str(e):
+                        self.log.info(f'Db connection got closed with - {e}')
+                        self.is_healthy = False
+                        return
             if attempt < retries:
                 self.log.info(f"Retrying in {wait} seconds...")
                 time.sleep(wait)
         return []
 
     def get_fra_limit(self):
+
         try:
             result = self.run_query("SELECT name,value FROM v$parameter WHERE name='db_recovery_file_dest_size'")[0][1]
             if int(result) >= human_read_to_byte('1024G'):
@@ -88,9 +99,10 @@ class DB:
             self.is_healthy = False
 
     def set_fra_limit(self):
-        if not self.fra_limit_set:
-            set_recovery_file_dest_size = 'alter system set db_recovery_file_dest_size=2000G scope=both'
-            self.run_query(set_recovery_file_dest_size)
+        if self.is_healthy:
+            if not self.fra_limit_set:
+                set_recovery_file_dest_size = 'alter system set db_recovery_file_dest_size=2000G scope=both'
+                self.run_query(set_recovery_file_dest_size)
 
     def get_dbfiles_limit(self):
         try:
@@ -105,9 +117,10 @@ class DB:
             self.log.fatal('Cannot get db files limit')
             self.is_healthy = False
     def set_db_files_limit(self):
-        if not self.db_files_limit_set:
-            set_db_files = 'alter system set db_files=20000 scope=spfile'
-            self.run_query(set_db_files)
+        if self.is_healthy:
+            if not self.db_files_limit_set and self.is_healthy:
+                set_db_files = 'alter system set db_files=20000 scope=spfile'
+                self.run_query(set_db_files)
 
     def get_tables(self):
         if self.is_healthy:
@@ -174,13 +187,17 @@ class DB:
             self.log.info(f'unhealthy db - {self} cannot pump data in this db')
         return self.is_healthy
 
+    # @profile
     def process_batch(self):
-        table_obj = random.choice(self.tables)
-        self.host.curr_number_of_batch += 1
-        table_obj.insert_batch(self.host.curr_number_of_batch, self.host.total_number_of_batches, self.lock)
-
+        if self.is_healthy:
+            table_obj = random.choice(self.tables)
+            self.host.curr_number_of_batch += 1
+            table_obj.insert_batch(self.host.curr_number_of_batch, self.host.total_number_of_batches, self.lock)
+        else:
+            self.log.info('db is not healthy skipping transaction')
+            self.host.failed_number_of_batch += 1
     def __repr__(self):
-        return f"{self.host}:{self.db_name}"
+        return f"{self.host}_{self.db_name}"
 
 if __name__ == '__main__':
     dbs = connect_to_oracle('10.131.37.81', 'SBTDB')
