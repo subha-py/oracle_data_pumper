@@ -2,6 +2,7 @@ import os
 from oracledb.exceptions import DatabaseError
 import random
 from string import ascii_letters
+import string
 from utils.memory import human_read_to_byte, bytes_to_human_read
 class Tablespace:
     def __init__(self, db, table, data_filesize='2G',name=None, autoextend=False, random_size=True):
@@ -40,10 +41,26 @@ class Tablespace:
         return datafiles
 
     def create_random_datafile_name(self):
+        base_dir = self.get_datafile_basename()
+        depth = random.randint(8, 10)
+        nested_path_parts = []
+        for level in range(1, depth + 1):
+            dir_name = f"level{level}_" + ''.join(
+                random.choices(string.ascii_lowercase + string.digits, k=15))
+            nested_path_parts.append(dir_name)
+
         random_string = ''.join(random.choices(ascii_letters, k=10))
-        datafile_name = f'{self.datafile_basename}_{random_string}.dbf'
-        self.datafiles.append(datafile_name)
-        return datafile_name
+        filename = f'{self.name}_{random_string}.dbf'
+        full_path = os.path.join(base_dir, *nested_path_parts, filename)
+
+        try:
+            self.db.host.exec_cmds([f"mkdir -p '{os.path.dirname(full_path)}'"])
+        except Exception as e:
+            self.db.log.fatal(f"Failed to create remote directory for datafile: {e}")
+            raise
+
+        self.datafiles.append(full_path)
+        return full_path
 
     def get_new_size(self):
         if self.random_size:
