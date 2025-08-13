@@ -90,4 +90,3 @@ if __name__ == '__main__':
     required.add_argument('--clusterip', help='ip/hostname of the db', type=str, required=True)
     result = parser.parse_args()
     startup_activities(result.clusterip)
-    startup_activities('123')
