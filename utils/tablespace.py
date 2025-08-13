@@ -7,10 +7,8 @@ from utils.memory import human_read_to_byte, bytes_to_human_read
 class Tablespace:
     def __init__(self, db, table, data_filesize='2G',name=None, autoextend=False, random_size=True):
         self.name = name
-        # self.data_filesize = data_filesize
-        self.data_filesize = '64G' # todo: revert me
-        # self.autoextend = autoextend
-        self.autoextend = True # todo: revert me
+        self.data_filesize = data_filesize
+        self.autoextend = autoextend
         self.random_size = random_size
         self.db = db
         self.table = table
@@ -93,18 +91,13 @@ class Tablespace:
     def create(self):
         self.name = f"{self.table.name}ts"
         self.datafile_basename = self.get_datafile_basename()
-        if self.autoextend:
-            # todo create big tablespace when autotextend is true
-            # todo revert me
+        if self.autoextend and human_read_to_byte(self.data_filesize) >= human_read_to_byte('32G') :
             cmd = (f"""
             create bigfile tablespace {self.name} \
-            datafile '{self.create_random_datafile_name(nested=False)}' size {self.data_filesize} \
-            AUTOEXTEND OFF \
+            datafile '{self.create_random_datafile_name()}' size {self.data_filesize} \
+            AUTOEXTEND ON NEXT {self.data_filesize}\
             EXTENT MANAGEMENT LOCAL \
             SEGMENT SPACE MANAGEMENT AUTO""")
-            # cmd = (f"""create tablespace {self.name} \
-            #         datafile '{self.create_random_datafile_name()}' size {self.data_filesize} AUTOEXTEND
-            #         ON NEXT {self.data_filesize} EXTENT MANAGEMENT LOCAL SEGMENT SPACE MANAGEMENT AUTO""")
         else:
             cmd = (f"create tablespace {self.name} \
                 datafile '{self.create_random_datafile_name()}' size {self.get_new_size()}")

@@ -32,15 +32,14 @@ def dump_logs_to_pluto(cluster_ip, logdir=None):
     )
 
 def startup_activities(cluster_ip):
-    # todo revert me
-    # hosts = get_registered_sources(cluster_ip=cluster_ip)
+
+    hosts = get_registered_sources(cluster_ip=cluster_ip)
     # todo: remove rac from this list - should have rac in its name
     # todo: datapump in pdbs - should have cdb in its name
     # todo: bigtablespace autoextend -> the db name should have big in its name
     # todo: add install agent if required
     # todo: mark unhealthy if oradata is missing
     # todo: do this for windows machine
-    hosts = [Host('10.131.37.211')]
     future_to_hosts = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
         for host in hosts:
@@ -58,23 +57,23 @@ def startup_activities(cluster_ip):
     # at this point all pumpable dbs are prepared
     all_scheduled_dbs = []
     # todo: revert me
-    # for host in hosts:
-    #     all_scheduled_dbs.extend(host.scheduled_dbs)
-    # random.shuffle(all_scheduled_dbs)
-    # future_to_dbs = {}
-    # result = []
-    # with concurrent.futures.ThreadPoolExecutor(max_workers=256) as executor:
-    #     for db in all_scheduled_dbs:
-    #             future = executor.submit(db.process_batch)
-    #             future_to_dbs[future] = str(db)
-    #     for future in concurrent.futures.as_completed(future_to_dbs):
-    #         db = future_to_dbs[future]
-    #         try:
-    #             res = future.result()
-    #             if not res:
-    #                 result.append(db)
-    #         except Exception as exc:
-    #             print(f"Batch {db} failed: {exc}")
+    for host in hosts:
+        all_scheduled_dbs.extend(host.scheduled_dbs)
+    random.shuffle(all_scheduled_dbs)
+    future_to_dbs = {}
+    result = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=256) as executor:
+        for db in all_scheduled_dbs:
+                future = executor.submit(db.process_batch)
+                future_to_dbs[future] = str(db)
+        for future in concurrent.futures.as_completed(future_to_dbs):
+            db = future_to_dbs[future]
+            try:
+                res = future.result()
+                if not res:
+                    result.append(db)
+            except Exception as exc:
+                print(f"Batch {db} failed: {exc}")
 
     create_report(hosts, cluster_ip)
     dump_logs_to_pluto(cluster_ip)
@@ -83,13 +82,12 @@ def startup_activities(cluster_ip):
 
 
 if __name__ == '__main__':
-    # todo revert me
-    # parser = argparse.ArgumentParser(description='Program to pump data in oracle sources registered in cluster')
-    # parser._action_groups.pop()
-    # required = parser.add_argument_group('required arguments')
-    # optional = parser.add_argument_group('optional arguments')
-    #
-    # required.add_argument('--clusterip', help='ip/hostname of the db', type=str, required=True)
-    # result = parser.parse_args()
-    # startup_activities(result.clusterip)
+    parser = argparse.ArgumentParser(description='Program to pump data in oracle sources registered in cluster')
+    parser._action_groups.pop()
+    required = parser.add_argument_group('required arguments')
+    optional = parser.add_argument_group('optional arguments')
+
+    required.add_argument('--clusterip', help='ip/hostname of the db', type=str, required=True)
+    result = parser.parse_args()
+    startup_activities(result.clusterip)
     startup_activities('123')

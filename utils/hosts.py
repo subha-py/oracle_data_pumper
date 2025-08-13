@@ -316,14 +316,12 @@ class Host:
         self.dbs = oracle_dbs
 
     def reboot_and_prepare(self):
-        # todo revert me
-        # self.prepare_services()
-        # self.change_oratab_entries()
-        # self.reboot()
+        self.prepare_services()
+        self.change_oratab_entries()
+        self.reboot()
 
         self.prepare_pump_eligible_dbs()
-        # todo revert me
-        # self.set_pumper_tasks()
+        self.set_pumper_tasks()
 
     def set_pumper_tasks(self):
         if self.is_healthy:
