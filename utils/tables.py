@@ -11,7 +11,7 @@ import pathlib
 from utils.tablespace import Tablespace
 from string import ascii_letters
 sys.path.append('/home/cohesity/PycharmProjects/oracle_data_pumper')
-
+sys.path.append('/home/cohesity/PycharmProjects/oracle_data_pumper/utils')
 class Table:
     def __init__(self, db, name=None):
         self.name = name
