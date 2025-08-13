@@ -57,24 +57,24 @@ def startup_activities(cluster_ip):
                 print(f"Batch {host} failed: {exc}")
     # at this point all pumpable dbs are prepared
     all_scheduled_dbs = []
-
-    for host in hosts:
-        all_scheduled_dbs.extend(host.scheduled_dbs)
-    random.shuffle(all_scheduled_dbs)
-    future_to_dbs = {}
-    result = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=256) as executor:
-        for db in all_scheduled_dbs:
-                future = executor.submit(db.process_batch)
-                future_to_dbs[future] = str(db)
-        for future in concurrent.futures.as_completed(future_to_dbs):
-            db = future_to_dbs[future]
-            try:
-                res = future.result()
-                if not res:
-                    result.append(db)
-            except Exception as exc:
-                print(f"Batch {db} failed: {exc}")
+    # todo: revert me
+    # for host in hosts:
+    #     all_scheduled_dbs.extend(host.scheduled_dbs)
+    # random.shuffle(all_scheduled_dbs)
+    # future_to_dbs = {}
+    # result = []
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=256) as executor:
+    #     for db in all_scheduled_dbs:
+    #             future = executor.submit(db.process_batch)
+    #             future_to_dbs[future] = str(db)
+    #     for future in concurrent.futures.as_completed(future_to_dbs):
+    #         db = future_to_dbs[future]
+    #         try:
+    #             res = future.result()
+    #             if not res:
+    #                 result.append(db)
+    #         except Exception as exc:
+    #             print(f"Batch {db} failed: {exc}")
 
     create_report(hosts, cluster_ip)
     dump_logs_to_pluto(cluster_ip)

@@ -19,7 +19,7 @@ class DB:
         self.is_healthy = True
         self.connection = self.connect()
         # todo revert me
-        self.target_table_count = 1
+        self.target_table_count = 25
         self.tables = []
         self.fra_limit_set = None
         self.db_files_limit_set = None
