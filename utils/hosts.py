@@ -1,3 +1,4 @@
+import random
 import sys
 sys.path.append('/Users/subha.bera/PycharmProjects/oracle_data_pumper')
 import paramiko
@@ -34,6 +35,8 @@ class Host:
         self.failed_number_of_batch = 0
         self.scheduled_dbs = []
         self.services = ['oracle-database.service', 'oracle-listener.service']
+        self.is_rac = False
+        self.rac_nodes = []
     def ping(self):
         try:
             subprocess.check_output(['ping', '-c', '1', '-W', '1', self.ip], stderr=subprocess.DEVNULL)
@@ -50,7 +53,7 @@ class Host:
         self.log.info('Marking host as unhealthy - it is not pingable')
         self.is_healthy = False
     def reboot(self):
-        if self.is_healthy:
+        if self.is_healthy and not self.is_rac:
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
@@ -74,11 +77,14 @@ class Host:
                 reboot_vm(vm, si)
                 self.wait_for_ping()
                 Disconnect(si)
+                self.log.info('Sleeping 5 mins before querying dbs ')
+                time.sleep(5 * 60)
 
             else:
                 self.log.warning(f"VM with IP {self.ip} not found.")
                 self.log.info('Marking host as unhealthy - cannot find it in vc')
                 self.is_healthy = False
+        # todo: reboot rac db via srvctl command
 
     def exec_cmds(self, commands, username=None, password=None, key=None, timeout=5 * 60, MAX_RETRIES=5, RETRY_WAIT=60):
         if not self.is_healthy:
@@ -89,18 +95,21 @@ class Host:
             username = self.username
         if password is None:
             password = self.password
+        if self.is_rac:
+            ip = random.choice(self.rac_nodes)
+        else:
+            ip = self.ip
         for attempt in range(1, MAX_RETRIES + 1):
             ssh_client = paramiko.SSHClient()
             ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.log.info(f"\n--- Attempt {attempt} - Connecting to {self.ip} ---")
-
             try:
                 if key:
-                    ssh_client.connect(hostname=self.ip, username=username, pkey=key, timeout=timeout)
+                    ssh_client.connect(hostname=ip, username=username, pkey=key, timeout=timeout)
                 else:
-                    ssh_client.connect(hostname=self.ip, username=username, password=password, timeout=timeout)
+                    ssh_client.connect(hostname=ip, username=username, password=password, timeout=timeout)
 
-                self.log.info(f"Successfully connected to {self.ip}")
+                self.log.info(f"Successfully connected to {ip}")
 
                 for cmd in commands:
                     self.log.info(f"\n  Executing command: '{cmd}'")
@@ -118,7 +127,7 @@ class Host:
                     self.log.info(f"  Command exited with status: {exit_status}")
 
                     if exit_status != 0:
-                        self.log.info(f"  WARNING: Command '{cmd}' failed on {self.ip}")
+                        self.log.info(f"  WARNING: Command '{cmd}' failed on {ip}")
                         raise Exception(f"Command '{cmd}' failed with exit status {exit_status}")
 
                     time.sleep(0.5)
@@ -126,23 +135,23 @@ class Host:
                 return stdout_output, stderr_output  # Success: return on first full execution
 
             except paramiko.AuthenticationException:
-                self.log.info(f"Authentication failed for {username}@{self.ip}. Please check credentials.")
+                self.log.info(f"Authentication failed for {username}@{ip}. Please check credentials.")
                 self.is_healthy = False
                 break
             except (paramiko.SSHException, paramiko.BadHostKeyException) as ssh_err:
-                self.log.info(f"SSH-related error on {self.ip}: {ssh_err}")
+                self.log.info(f"SSH-related error on {ip}: {ssh_err}")
             except Exception as e:
-                self.log.info(f"Execution failed on attempt {attempt} for {self.ip}: {e}")
+                self.log.info(f"Execution failed on attempt {attempt} for {ip}: {e}")
             finally:
                 if ssh_client.get_transport() and ssh_client.get_transport().is_active():
-                    self.log.info(f"Closing connection to {self.ip}")
+                    self.log.info(f"Closing connection to {ip}")
                     ssh_client.close()
 
             if attempt < MAX_RETRIES:
                 self.log.info(f"Retrying in {RETRY_WAIT} seconds...")
                 time.sleep(RETRY_WAIT)
             else:
-                self.log.info(f"All retry attempts exhausted for {self.ip}. Giving up.")
+                self.log.info(f"All retry attempts exhausted for {ip}. Giving up.")
 
         return None, None  # Return None if all attempts failed
     def get_disk_usage_multiple_in_gbs(self, mount_points=None):
@@ -197,6 +206,9 @@ class Host:
     def get_oracle_dbs(self, oratab_path='/etc/oratab'):
         if not self.is_healthy:
             return []
+        if self.is_rac:
+            self.get_rac_dbs()
+            return
         oracle_dbs = []
         sid = None
         self.log.info('Trying to get dbs from hosts')
@@ -212,7 +224,7 @@ class Host:
                 if len(parts) >= 2:
                     sid = parts[0].strip().upper()
                 try:
-                    if 'multi' in sid:
+                    if 'multi' in sid: # not taking pdbs
                         continue
                     oracle_dbs.append(DB(sid, self))
                 except Exception as e:
@@ -224,18 +236,20 @@ class Host:
             self.is_healthy = False
 
     def is_space_available(self):
-        mount_points = ['/u02', '/']
-        result = self.get_disk_usage_multiple_in_gbs(mount_points)
-        self.log.info(f'current space usage of {mount_points} -> {result}')
-        u02_limit = 300
-        root_limit = 2
-        if result['/u02'] < u02_limit: #todo: take dynamically from self.pump_size_in_gb
-            self.log.info(f"/u02 have low free memory(got {result['/u02']}), expected (> {u02_limit}) marking this host as unhealthy")
-            self.is_healthy = False
-        elif result['/'] < root_limit:
-            self.log.info(f"/ have low free memory(got {result['/']}), expected (> {root_limit}) marking this host as unhealthy")
-            self.is_healthy = False
-        return
+        if not self.is_rac:
+            mount_points = ['/u02', '/']
+            result = self.get_disk_usage_multiple_in_gbs(mount_points)
+            self.log.info(f'current space usage of {mount_points} -> {result}')
+            u02_limit = 300
+            root_limit = 2
+            if result['/u02'] < u02_limit: #todo: take dynamically from self.pump_size_in_gb
+                self.log.info(f"/u02 have low free memory(got {result['/u02']}), expected (> {u02_limit}) marking this host as unhealthy")
+                self.is_healthy = False
+            elif result['/'] < root_limit:
+                self.log.info(f"/ have low free memory(got {result['/']}), expected (> {root_limit}) marking this host as unhealthy")
+                self.is_healthy = False
+            return
+        # todo: for rac need to check size via asmcmd
     def prepare_pump_eligible_dbs(self):
         # hosts who have enough space
         self.is_space_available()
@@ -282,17 +296,30 @@ class Host:
                 f'sudo systemctl start {service_name}',f'sudo systemctl status {service_name}']
             self.exec_cmds(commands, username=self.root_username, password=self.root_password, MAX_RETRIES=1)
     def prepare_services(self):
-        for service in self.services:
-            self.set_service(service)
+        if not self.is_rac:
+            for service in self.services:
+                self.set_service(service)
+        # todo: for rac we can check the crs commands
     def change_oratab_entries(self):
-        oratab_commands = [r"sudo sed -i 's/^\([^#][^:]*:[^:]*:\)N/\1Y/' /etc/oratab"]
-        self.exec_cmds(oratab_commands)
+        if not self.is_rac:
+            oratab_commands = [r"sudo sed -i 's/^\([^#][^:]*:[^:]*:\)N/\1Y/' /etc/oratab"]
+            self.exec_cmds(oratab_commands)
+        # todo: need to find a way to db_start for rac
+    def get_rac_dbs(self):
+        cmd = "source ~/.bash_profile && srvctl config database"
+        output = self.exec_cmds([cmd])[0]
+        oracle_dbs = []
+        if output:
+            db_list = output.splitlines()
+            for db in db_list:
+                oracle_dbs.append(DB(db, self))
+        self.dbs = oracle_dbs
+
     def reboot_and_prepare(self):
         self.prepare_services()
         self.change_oratab_entries()
         self.reboot()
-        self.log.info('Sleeping 5 mins before querying dbs ')
-        time.sleep(5 * 60)
+
         self.prepare_pump_eligible_dbs()
         self.set_pumper_tasks()
 
@@ -310,5 +337,7 @@ class Host:
 
 
 if __name__ == '__main__':
-    host_obj = Host('10.131.37.84')
+    host_obj = Host('10.131.37.249')
+    host_obj.is_rac = True
+    host_obj.rac_nodes = ['10.131.37.241', '10.131.37.242', '10.131.37.243']
     host_obj.reboot_and_prepare()

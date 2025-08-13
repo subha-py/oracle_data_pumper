@@ -80,7 +80,14 @@ def get_registered_sources(cluster_ip,source_type='oracle'):
         registrationInfo=source['registrationInfo']
         env = registrationInfo.get('environments')
         if env is not None and source_type in env[0].lower() and 'linux' in source['rootNode']['physicalProtectionSource']['osName'].lower():
-                result.append(Host(ip=registrationInfo['accessInfo']['endpoint']))
+                host_obj = Host(ip=registrationInfo['accessInfo']['endpoint'])
+                if 'rac' in source['rootNode']['physicalProtectionSource']['type'].lower():
+                    host_obj.is_rac = True
+                    host_obj.log.info('This is a rac setup!')
+                    for agent in source['rootNode']['physicalProtectionSource']['agents']:
+                        host_obj.rac_nodes.append(agent['name'])
+                    host_obj.log.info(f'rac nodes in this setup - {host_obj.rac_nodes}')
+                result.append(host_obj)
     print(f'cluster ip - {cluster_ip}\n \noracle sources - {result}')
     return result
 
@@ -106,6 +113,4 @@ def get_cluster_name(ip):
         return ip
 
 if __name__ == '__main__':
-    cluster_ip = '10.131.32.2'
-    result = get_cluster_name(cluster_ip)
-    print(result)
+    hosts = get_registered_sources(cluster_ip='10.14.7.1')

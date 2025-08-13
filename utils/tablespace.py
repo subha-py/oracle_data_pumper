@@ -41,7 +41,15 @@ class Tablespace:
         return datafiles
 
     def create_random_datafile_name(self):
-        base_dir = self.get_datafile_basename()
+        if self.db.host.is_rac:
+            random_string = ''.join(random.choices(ascii_letters, k=10))
+            datafile_name = f'{self.datafile_basename}_{random_string}.dbf'
+            # todo: this can be done later
+            # this is due to the fact we cannot mkdir in rac we need to use asmcmd to do that.
+            self.datafiles.append(datafile_name)
+            return datafile_name
+
+        base_dir = self.datafile_basename
         depth = random.randint(8, 10)
         nested_path_parts = []
         for level in range(1, depth + 1):
