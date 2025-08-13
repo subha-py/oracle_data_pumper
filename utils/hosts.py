@@ -323,7 +323,7 @@ class Host:
 
         self.prepare_pump_eligible_dbs()
         # todo revert me
-        # self.set_pumper_tasks()
+        self.set_pumper_tasks()
 
     def set_pumper_tasks(self):
         if self.is_healthy:

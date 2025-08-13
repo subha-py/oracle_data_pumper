@@ -79,7 +79,6 @@ class Table:
                 rows.append(self.create_row())
         self.db.log.info(f"inserting into {self.name}: batch_number: {batch_number}/{number_of_batches}")
         with self.db.connection.cursor() as cursor:
-            cursor.setinputsizes(24, DB_TYPE_BOOLEAN, DB_TYPE_NUMBER, 10)
             try:
                 cursor.executemany(f"insert into {self.name} (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
             except DatabaseError as e:
