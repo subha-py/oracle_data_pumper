@@ -285,3 +285,10 @@ def create_todo_item_table(connection, db_name, datafile_size,
             create_single_todoitem_table(connection, db_name, tablename, tablespace_name, datafile_size, autoextend)
     else:
         print("Tables already exist. Skipping creation.")
+
+if __name__ == '__main__':
+    from utils.connection import connect_to_oracle
+    conn = connect_to_oracle('10.131.37.211', 'PROD1')
+    tables = ['todoitemqSzP', 'todoitemoyQG', 'todoitemIWrq', 'todoitemhJDc', 'todoitemyBIY', 'todoitemktVN', 'todoitemSzOJ', 'todoitemwNEx', 'todoitemQhNk']
+    for table in tables:
+        delete_todoitem_table(conn, table)
