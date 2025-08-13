@@ -10,6 +10,7 @@ from utils.cohesity import get_registered_sources, get_cluster_name
 import logging
 import concurrent.futures
 import argparse
+from utils.hosts import Host
 def pull_latest_code(repo_path="."):
     logger = logging.getLogger(os.environ.get("log_file_name"))
     logger.info(f"Attempting to pull latest code in: {os.path.abspath(repo_path)}")
@@ -31,13 +32,15 @@ def dump_logs_to_pluto(cluster_ip, logdir=None):
     )
 
 def startup_activities(cluster_ip):
-    hosts = get_registered_sources(cluster_ip=cluster_ip)
+    # todo revert me
+    # hosts = get_registered_sources(cluster_ip=cluster_ip)
     # todo: remove rac from this list - should have rac in its name
     # todo: datapump in pdbs - should have cdb in its name
     # todo: bigtablespace autoextend -> the db name should have big in its name
     # todo: add install agent if required
     # todo: mark unhealthy if oradata is missing
     # todo: do this for windows machine
+    hosts = [Host('10.131.37.211')]
     future_to_hosts = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
         for host in hosts:
@@ -80,11 +83,13 @@ def startup_activities(cluster_ip):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Program to pump data in oracle sources registered in cluster')
-    parser._action_groups.pop()
-    required = parser.add_argument_group('required arguments')
-    optional = parser.add_argument_group('optional arguments')
-
-    required.add_argument('--clusterip', help='ip/hostname of the db', type=str, required=True)
-    result = parser.parse_args()
-    startup_activities(result.clusterip)
+    # todo revert me
+    # parser = argparse.ArgumentParser(description='Program to pump data in oracle sources registered in cluster')
+    # parser._action_groups.pop()
+    # required = parser.add_argument_group('required arguments')
+    # optional = parser.add_argument_group('optional arguments')
+    #
+    # required.add_argument('--clusterip', help='ip/hostname of the db', type=str, required=True)
+    # result = parser.parse_args()
+    # startup_activities(result.clusterip)
+    startup_activities('123')

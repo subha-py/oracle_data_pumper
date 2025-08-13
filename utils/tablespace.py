@@ -7,8 +7,10 @@ from utils.memory import human_read_to_byte, bytes_to_human_read
 class Tablespace:
     def __init__(self, db, table, data_filesize='2G',name=None, autoextend=False, random_size=True):
         self.name = name
-        self.data_filesize = data_filesize
-        self.autoextend = autoextend
+        # self.data_filesize = data_filesize
+        self.data_filesize = '64G' # todo: revert me
+        # self.autoextend = autoextend
+        self.autoextend = True # todo: revert me
         self.random_size = random_size
         self.db = db
         self.table = table
@@ -40,7 +42,7 @@ class Tablespace:
             datafiles.append(datafile[0])
         return datafiles
 
-    def create_random_datafile_name(self):
+    def create_random_datafile_name(self, nested=True):
         if self.db.host.is_rac:
             random_string = ''.join(random.choices(ascii_letters, k=10))
             datafile_name = f'{self.datafile_basename}_{random_string}.dbf'
@@ -48,24 +50,32 @@ class Tablespace:
             # this is due to the fact we cannot mkdir in rac we need to use asmcmd to do that.
             self.datafiles.append(datafile_name)
             return datafile_name
+        if nested:
+            base_dir = self.datafile_basename
+            depth = random.randint(8, 10)
+            nested_path_parts = []
+            for level in range(1, depth + 1):
+                dir_name = f"level{level}_" + ''.join(
+                    random.choices(string.ascii_lowercase + string.digits, k=15))
+                nested_path_parts.append(dir_name)
 
-        base_dir = self.datafile_basename
-        depth = random.randint(8, 10)
-        nested_path_parts = []
-        for level in range(1, depth + 1):
-            dir_name = f"level{level}_" + ''.join(
-                random.choices(string.ascii_lowercase + string.digits, k=15))
-            nested_path_parts.append(dir_name)
+            random_string = ''.join(random.choices(ascii_letters, k=10))
+            filename = f'{self.name}_{random_string}.dbf'
+            full_path = os.path.join(base_dir, *nested_path_parts, filename)
+            try:
+                self.db.host.exec_cmds([f"mkdir -p '{os.path.dirname(full_path)}'"])
+            except Exception as e:
+                self.db.log.fatal(f"Failed to create remote directory for datafile: {e}")
+                raise
+        else:
+            random_string = ''.join(random.choices(ascii_letters, k=10))
+            datafile_name = f'{self.datafile_basename}_{random_string}.dbf'
+            # todo: this can be done later
+            # this is due to the fact we cannot mkdir in rac we need to use asmcmd to do that.
+            self.datafiles.append(datafile_name)
+            return datafile_name
 
-        random_string = ''.join(random.choices(ascii_letters, k=10))
-        filename = f'{self.name}_{random_string}.dbf'
-        full_path = os.path.join(base_dir, *nested_path_parts, filename)
 
-        try:
-            self.db.host.exec_cmds([f"mkdir -p '{os.path.dirname(full_path)}'"])
-        except Exception as e:
-            self.db.log.fatal(f"Failed to create remote directory for datafile: {e}")
-            raise
 
         self.datafiles.append(full_path)
         return full_path
@@ -85,9 +95,16 @@ class Tablespace:
         self.datafile_basename = self.get_datafile_basename()
         if self.autoextend:
             # todo create big tablespace when autotextend is true
-            cmd = (f"""create tablespace {self.name} \
-                    datafile '{self.create_random_datafile_name()}' size {self.data_filesize} AUTOEXTEND 
-                    ON NEXT {self.data_filesize} EXTENT MANAGEMENT LOCAL SEGMENT SPACE MANAGEMENT AUTO""")
+            # todo revert me
+            cmd = (f"""
+            create bigfile tablespace {self.name} \
+            datafile '{self.create_random_datafile_name(nested=False)} size {self.data_filesize}' \
+            AUTOEXTEND OFF \
+            EXTENT MANAGEMENT LOCAL \
+            SEGMENT SPACE MANAGEMENT AUTO""")
+            # cmd = (f"""create tablespace {self.name} \
+            #         datafile '{self.create_random_datafile_name()}' size {self.data_filesize} AUTOEXTEND
+            #         ON NEXT {self.data_filesize} EXTENT MANAGEMENT LOCAL SEGMENT SPACE MANAGEMENT AUTO""")
         else:
             cmd = (f"create tablespace {self.name} \
                 datafile '{self.create_random_datafile_name()}' size {self.get_new_size()}")

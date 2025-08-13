@@ -86,7 +86,7 @@ class Host:
                 self.is_healthy = False
         # todo: reboot rac db via srvctl command
 
-    def exec_cmds(self, commands, username=None, password=None, key=None, timeout=5 * 60, MAX_RETRIES=5, RETRY_WAIT=60):
+    def exec_cmds(self, commands, username=None, password=None, key=None, timeout=60 * 60, MAX_RETRIES=5, RETRY_WAIT=60):
         if not self.is_healthy:
             self.log.info(f"Host {self.ip} is marked unhealthy. Skipping execution.")
             return None, None
@@ -316,12 +316,14 @@ class Host:
         self.dbs = oracle_dbs
 
     def reboot_and_prepare(self):
-        self.prepare_services()
-        self.change_oratab_entries()
-        self.reboot()
+        # todo revert me
+        # self.prepare_services()
+        # self.change_oratab_entries()
+        # self.reboot()
 
         self.prepare_pump_eligible_dbs()
-        self.set_pumper_tasks()
+        # todo revert me
+        # self.set_pumper_tasks()
 
     def set_pumper_tasks(self):
         if self.is_healthy:

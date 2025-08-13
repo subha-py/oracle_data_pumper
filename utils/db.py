@@ -10,7 +10,7 @@ from utils.memory import human_read_to_byte
 from threading import Lock
 import time
 class DB:
-    def __init__(self, db_name, host, username='sys', password='cohesity', type='standalone'):
+    def __init__(self, db_name, host, username='sys', password='cohesity'):
         self.db_name = db_name
         self.host = host
         self.username = username
@@ -18,7 +18,8 @@ class DB:
         self.log = set_logger(f"{self.host.ip}_{self.db_name}", 'dbs')
         self.is_healthy = True
         self.connection = self.connect()
-        self.target_table_count = 25
+        # todo revert me
+        self.target_table_count = 1
         self.tables = []
         self.fra_limit_set = None
         self.db_files_limit_set = None
