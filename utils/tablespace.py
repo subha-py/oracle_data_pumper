@@ -98,7 +98,7 @@ class Tablespace:
             # todo revert me
             cmd = (f"""
             create bigfile tablespace {self.name} \
-            datafile '{self.create_random_datafile_name(nested=False)} size {self.data_filesize}' \
+            datafile '{self.create_random_datafile_name(nested=False)}' size {self.data_filesize} \
             AUTOEXTEND OFF \
             EXTENT MANAGEMENT LOCAL \
             SEGMENT SPACE MANAGEMENT AUTO""")
