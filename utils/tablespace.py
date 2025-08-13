@@ -113,6 +113,8 @@ class Tablespace:
         self.db.log.info(f'tablespace created with name - {self.name}')
 
     def extend(self):
+        self.db.log.info(f'will not extend this tablespace - {self.name}')
+        return
         new_size = self.get_new_size()
         self.db.log.info(f'Extending tablespace by {new_size}')
         cmd = f"""ALTER TABLESPACE {self.name} ADD DATAFILE 
