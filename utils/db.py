@@ -1,5 +1,5 @@
 
-from utils.connection import connect_to_oracle
+from utils.connection import connect_to_oracle, connect_to_oracle_pool
 import os
 from utils.log import set_logger
 import random
@@ -18,6 +18,7 @@ class DB:
         self.log = set_logger(f"{self.host.ip}_{self.db_name}", 'dbs')
         self.is_healthy = True
         self.connection = self.connect()
+        self.connection_pool = self.get_connect_pool()
         # todo revert me
         self.target_table_count = 16
         self.tables = []
@@ -25,6 +26,28 @@ class DB:
         self.db_files_limit_set = None
         self.lock = Lock()
         self.get_tables()
+
+    def get_connect_pool(self, max_retries=5, wait_seconds=60):
+        for attempt in range(1, max_retries + 1):
+            try:
+                return connect_to_oracle_pool(self.host, self.db_name)
+            except Exception as e:
+                if 'not registered with the listener' in str(e):
+                    self.log.info('cannot connect with db')
+                    self.is_healthy = False
+                    return
+                elif 'Listener refused connection' in str(e):
+                    self.log.info('cannot connect with db')
+                    self.is_healthy = False
+                    return
+                self.log.info(f"[Attempt {attempt}/{max_retries}] Connection failed: {e}")
+                if attempt < max_retries:
+                    self.log.info(f"Retrying in {wait_seconds} seconds...")
+                    time.sleep(wait_seconds)
+                else:
+                    self.log.info("All retries failed.")
+                    return
+
 
     def connect(self, max_retries=5, wait_seconds=60):
         for attempt in range(1, max_retries + 1):
