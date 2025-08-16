@@ -125,7 +125,7 @@ class DB:
     def set_fra_limit(self):
         if self.is_healthy:
             if not self.fra_limit_set:
-                set_recovery_file_dest_size = 'alter system set db_recovery_file_dest_size=2000G scope=both'
+                set_recovery_file_dest_size = 'alter system set db_recovery_file_dest_size=6T scope=both'
                 self.run_query(set_recovery_file_dest_size)
 
     def get_dbfiles_limit(self):
