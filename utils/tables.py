@@ -26,6 +26,7 @@ class Table:
                 random_string = ''.join(random.choices(ascii_letters, k=4))
                 self.name = f"todoitem{random_string}"
             self.create()
+        self.row_count = self.get_row_count()
     def is_created(self):
         if self.name is None:
             return False
@@ -62,14 +63,130 @@ class Table:
                                 TABLESPACE {self.tablespace.name}""")
         self.db.log.info(f"Created table {self.name}")
 
-    def create_row(self):
+    def create_row(self, row_id=None):
         ascii_letters = list(string.ascii_letters)
         task_number = random.randint(1, sys.maxsize)
         random_string = ''.join(random.choices(ascii_letters, k=10))
         toggle = random.choice([True, False])
-        return f'Task:{random.randint(0, sys.maxsize) + 1}', toggle, task_number, random_string
+        if row_id is None:
+         return f'Task:{random.randint(0, sys.maxsize) + 1}', toggle, task_number, random_string
+        else:
+            return f'Task:{random.randint(0, sys.maxsize) + 1}', toggle, task_number, random_string, row_id
 
+    def get_random_ids(self):
+        cmd = (f"""
+            SELECT id FROM (
+                SELECT id FROM todoitemoxub ORDER BY DBMS_RANDOM.VALUE
+            ) WHERE ROWNUM <= {self.batch_size}
+        """)
+        ids = [row[0] for row in self.db.run_query(cmd)]
+        return ids
 
+    def update_batch(self, batch_number, number_of_batches, lock, rows=None):
+        self.db.log.info(f"updating into {self.name}: batch_number: {batch_number}/{number_of_batches}")
+        if rows is None:
+            rows = []
+            ids = self.get_random_ids()
+            for id in ids:
+                rows.append(self.create_row(row_id=id))
+        with self.db.connection_pool.acquire() as connection:
+            with connection.cursor() as cursor:
+                try:
+                    cursor.executemany(f"""
+                        UPDATE {self.name}
+                           SET description = :1,
+                               done = :2,
+                               randomnumber = :3,
+                               randomstring = :4
+                         WHERE id = :5
+                    """, rows, batcherrors=True)
+                except DatabaseError as e:
+                    if 'unable to extend' in str(e):
+                        # acquire lock
+                        if not lock.locked():
+                            start = time.time()
+                            lock.acquire()
+                            try:
+                                self.db.log.info(f'Acquired lock by batch number - {batch_number}/{number_of_batches}')
+                                self.db.log.info('Failed to insert data due to lack of space in tablespace')
+                                self.tablespace.extend()
+                                cursor.executemany(f"""
+                                                        UPDATE {self.name}
+                                                           SET description = :1,
+                                                               done = :2,
+                                                               randomnumber = :3,
+                                                               randomstring = :4
+                                                         WHERE id = :5
+                                                    """, rows, batcherrors=True)
+                                self.db.log.info(f'lock released by batch number- \
+                                        :{batch_number}/{number_of_batches}')
+                                lock.release()
+                                end = time.time()
+                                self.db.log.info(f'lock is held by batch \
+                                         - :{batch_number}/{number_of_batches} \
+                                         for - {end - start} secs')
+                            except DatabaseError as e:
+                                if 'unable to extend' in str(e):
+                                    lock.release()
+                                    self.db.log.info(f'batch - :{batch_number}/{number_of_batches} \
+                                            is going to recursion')
+                                    # go to recursion
+                                    self.update_batch(batch_number, number_of_batches, lock, rows)
+                                    return
+                            except Exception as e:
+                                self.db.log.info(f'got exception - {e} - batch number - \
+                                        :{batch_number}/{number_of_batches}')
+                                lock.release()
+
+                        else:
+                            while lock.locked():
+                                sleep_time = random.randint(180, 300)
+                                self.db.log.info(f'{datetime.datetime.now()}:\
+                                        batch number - :{batch_number}/{number_of_batches}\
+                                         is going to sleep for {sleep_time} secs since \
+                                        tablespace is expanding')
+                                time.sleep(sleep_time)
+                            try:
+                                cursor.executemany(f"""
+                                                        UPDATE {self.name}
+                                                           SET description = :1,
+                                                               done = :2,
+                                                               randomnumber = :3,
+                                                               randomstring = :4
+                                                         WHERE id = :5
+                                                    """, rows, batcherrors=True)
+
+                            except DatabaseError as e:
+                                if 'unable to extend' in str(e):
+                                    self.db.log.info(f'batch - :{batch_number}/{number_of_batches} \
+                                            is going to recursion')
+                                    # go to recursion
+                                    self.update_batch(batch_number, number_of_batches, lock, rows)
+                                    return
+                    elif 'the database or network closed the connection' in str(e):
+                        self.db.log.info('This happens when there is a connection error between db and pumper')
+                        self.db.log.info(f'db is marked unhealthy, because {e}')
+                        self.db.is_healthy = False
+                        self.db.host.failed_number_of_batch += 1
+                except Exception as e:
+                    if 'object has not attribute' in str(e):
+                        self.db.log.info('This happens when database closes the connection')
+                        self.db.log.info(f'db is marked unhealthy, because {e}')
+                        self.db.is_healthy = False
+                        self.db.host.failed_number_of_batch += 1
+            try:
+                if self.db.is_healthy:
+                    connection.commit()
+            except AttributeError as e:
+                self.db.log.info('This happens when db is shutdown while pumper is running')
+                self.db.log.info('cannot commit this transaction, will mark this db as unhealthy')
+                self.db.is_healthy = False
+                self.db.host.failed_number_of_batch += 1
+        del rows
+        if self.db.is_healthy:
+            # sleep_time = random.randint(1,5)
+            self.db.log.info(f'{self.db}-{self}-Committed batch number - :{batch_number}/{number_of_batches}')
+        return
 
 
     def insert_batch(self, batch_number, number_of_batches, lock, rows=None):
@@ -158,7 +275,12 @@ class Table:
             self.db.log.info(f'{self.db}-{self}-Committed batch number - :{batch_number}/{number_of_batches}')
         return
 
-
+    def get_row_count(self):
+        if self.db.host.update_rows:
+            cmd = f'SELECT COUNT(*) AS row_count FROM {self.name}'
+            return self.db.run_query(cmd)[0][0]
+        else:
+            return 0
     def __repr__(self):
         return self.name
 

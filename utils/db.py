@@ -26,6 +26,7 @@ class DB:
         self.db_files_limit_set = None
         self.lock = Lock()
         self.get_tables()
+        self.row_count = self.tables_all_row_count()
 
     def get_connect_pool(self, max_retries=5, wait_seconds=60):
         for attempt in range(1, max_retries + 1):
@@ -154,6 +155,12 @@ class DB:
                 table_name = table[0]
                 self.tables.append(Table(db=self,name=table_name))
 
+    def tables_all_row_count(self):
+        count = 0
+        for table in self.tables:
+            count += table.row_count
+        return count
+
 
     def delete_table(self, tablename='todoitem'):
         with self.connection.cursor() as cursor:
@@ -202,9 +209,10 @@ class DB:
         # todo: if big in name should have only ony table with name todoitem
         if not self.connection:
             self.is_listener_connectivity_available()
-        self.set_fra_limit()
-        self.set_db_files_limit()
-        self.create_tables()
+        else:
+            self.set_fra_limit()
+            self.set_db_files_limit()
+            self.create_tables()
         if self.is_healthy:
             self.log.info(f'db is healthy - {self} and ready to pump data')
         else:
@@ -216,7 +224,10 @@ class DB:
         if self.is_healthy:
             table_obj = random.choice(self.tables)
             self.host.curr_number_of_batch += 1
-            table_obj.insert_batch(self.host.curr_number_of_batch, self.host.total_number_of_batches, self.lock)
+            if self.host.update_rows:
+                table_obj.update_batch(self.host.curr_number_of_batch, self.host.total_number_of_batches, self.lock)
+            else:
+                table_obj.insert_batch(self.host.curr_number_of_batch, self.host.total_number_of_batches, self.lock)
         else:
             self.log.info('db is not healthy skipping transaction')
             self.host.failed_number_of_batch += 1

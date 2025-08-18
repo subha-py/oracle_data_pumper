@@ -29,7 +29,7 @@ class Host:
         self.pump_size_in_gb = '4048G'
         self.batch_size = 10000
         self.total_rows_required = get_number_of_rows_from_file_size(self.pump_size_in_gb)
-        self.total_number_of_batches = self.total_rows_required // self.batch_size
+        self.total_number_of_batches = 0
         self.dbs = []
         self.curr_number_of_batch = 0
         self.failed_number_of_batch = 0
@@ -37,6 +37,9 @@ class Host:
         self.services = ['oracle-database.service', 'oracle-listener.service']
         self.is_rac = False
         self.rac_nodes = []
+        self.update_rows = True #todo: check queries to decide on this attribute
+        self.total_actual_rows = 0
+
     def ping(self):
         try:
             subprocess.check_output(['ping', '-c', '1', '-W', '1', self.ip], stderr=subprocess.DEVNULL)
@@ -260,6 +263,10 @@ class Host:
         for db in self.dbs:
             if db.is_pumpable():
                 self.pumpable_dbs.append(db)
+                if self.update_rows:
+                    self.total_actual_rows += db.row_count
+
+
 
     def execute_pumper(self, executor):
         future_to_batch = {}
@@ -327,6 +334,9 @@ class Host:
 
     def set_pumper_tasks(self):
         if self.is_healthy:
+            if self.update_rows:
+                self.total_rows_required = int(self.total_actual_rows * 0.1) # we will update only 10%
+            self.total_number_of_batches = max(self.total_rows_required // self.batch_size, 1)
             self.log.info(f'Got eligible dbs - {self.pumpable_dbs}')
             if self.pumpable_dbs:
                 db_cycle = cycle(self.pumpable_dbs)
@@ -339,7 +349,7 @@ class Host:
 
 
 if __name__ == '__main__':
-    host_obj = Host('10.131.37.249')
-    host_obj.is_rac = True
-    host_obj.rac_nodes = ['10.131.37.241', '10.131.37.242', '10.131.37.243']
+    host_obj = Host('10.14.69.186')
     host_obj.reboot_and_prepare()
+    db = host_obj.pumpable_dbs[0]
+    db.process_batch()

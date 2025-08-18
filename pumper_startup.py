@@ -76,8 +76,8 @@ def startup_activities(cluster_ip):
             except Exception as exc:
                 print(f"Batch {db} failed: {exc}")
 
-    create_report(hosts, cluster_ip)
-    dump_logs_to_pluto(cluster_ip)
+    # create_report(hosts, cluster_ip)
+    # dump_logs_to_pluto(cluster_ip)
     return result
 
 
