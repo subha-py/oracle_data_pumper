@@ -102,67 +102,68 @@ class Table:
                     """, rows, batcherrors=True)
                 except DatabaseError as e:
                     if 'unable to extend' in str(e):
+                        return
                         # acquire lock
-                        if not lock.locked():
-                            start = time.time()
-                            lock.acquire()
-                            try:
-                                self.db.log.info(f'Acquired lock by batch number - {batch_number}/{number_of_batches}')
-                                self.db.log.info('Failed to insert data due to lack of space in tablespace')
-                                self.tablespace.extend()
-                                cursor.executemany(f"""
-                                                        UPDATE {self.name}
-                                                           SET description = :1,
-                                                               done = :2,
-                                                               randomnumber = :3,
-                                                               randomstring = :4
-                                                         WHERE id = :5
-                                                    """, rows, batcherrors=True)
-                                self.db.log.info(f'lock released by batch number- \
-                                        :{batch_number}/{number_of_batches}')
-                                lock.release()
-                                end = time.time()
-                                self.db.log.info(f'lock is held by batch \
-                                         - :{batch_number}/{number_of_batches} \
-                                         for - {end - start} secs')
-                            except DatabaseError as e:
-                                if 'unable to extend' in str(e):
-                                    lock.release()
-                                    self.db.log.info(f'batch - :{batch_number}/{number_of_batches} \
-                                            is going to recursion')
-                                    # go to recursion
-                                    self.update_batch(batch_number, number_of_batches, lock, rows)
-                                    return
-                            except Exception as e:
-                                self.db.log.info(f'got exception - {e} - batch number - \
-                                        :{batch_number}/{number_of_batches}')
-                                lock.release()
-
-                        else:
-                            while lock.locked():
-                                sleep_time = random.randint(180, 300)
-                                self.db.log.info(f'{datetime.datetime.now()}:\
-                                        batch number - :{batch_number}/{number_of_batches}\
-                                         is going to sleep for {sleep_time} secs since \
-                                        tablespace is expanding')
-                                time.sleep(sleep_time)
-                            try:
-                                cursor.executemany(f"""
-                                                        UPDATE {self.name}
-                                                           SET description = :1,
-                                                               done = :2,
-                                                               randomnumber = :3,
-                                                               randomstring = :4
-                                                         WHERE id = :5
-                                                    """, rows, batcherrors=True)
-
-                            except DatabaseError as e:
-                                if 'unable to extend' in str(e):
-                                    self.db.log.info(f'batch - :{batch_number}/{number_of_batches} \
-                                            is going to recursion')
-                                    # go to recursion
-                                    self.update_batch(batch_number, number_of_batches, lock, rows)
-                                    return
+                        # if not lock.locked():
+                        #     start = time.time()
+                        #     lock.acquire()
+                        #     try:
+                        #         self.db.log.info(f'Acquired lock by batch number - {batch_number}/{number_of_batches}')
+                        #         self.db.log.info('Failed to insert data due to lack of space in tablespace')
+                        #         self.tablespace.extend()
+                        #         cursor.executemany(f"""
+                        #                                 UPDATE {self.name}
+                        #                                    SET description = :1,
+                        #                                        done = :2,
+                        #                                        randomnumber = :3,
+                        #                                        randomstring = :4
+                        #                                  WHERE id = :5
+                        #                             """, rows, batcherrors=True)
+                        #         self.db.log.info(f'lock released by batch number- \
+                        #                 :{batch_number}/{number_of_batches}')
+                        #         lock.release()
+                        #         end = time.time()
+                        #         self.db.log.info(f'lock is held by batch \
+                        #                  - :{batch_number}/{number_of_batches} \
+                        #                  for - {end - start} secs')
+                        #     except DatabaseError as e:
+                        #         if 'unable to extend' in str(e):
+                        #             lock.release()
+                        #             self.db.log.info(f'batch - :{batch_number}/{number_of_batches} \
+                        #                     is going to recursion')
+                        #             # go to recursion
+                        #             self.update_batch(batch_number, number_of_batches, lock, rows)
+                        #             return
+                        #     except Exception as e:
+                        #         self.db.log.info(f'got exception - {e} - batch number - \
+                        #                 :{batch_number}/{number_of_batches}')
+                        #         lock.release()
+                        #
+                        # else:
+                        #     while lock.locked():
+                        #         sleep_time = random.randint(180, 300)
+                        #         self.db.log.info(f'{datetime.datetime.now()}:\
+                        #                 batch number - :{batch_number}/{number_of_batches}\
+                        #                  is going to sleep for {sleep_time} secs since \
+                        #                 tablespace is expanding')
+                        #         time.sleep(sleep_time)
+                        #     try:
+                        #         cursor.executemany(f"""
+                        #                                 UPDATE {self.name}
+                        #                                    SET description = :1,
+                        #                                        done = :2,
+                        #                                        randomnumber = :3,
+                        #                                        randomstring = :4
+                        #                                  WHERE id = :5
+                        #                             """, rows, batcherrors=True)
+                        #
+                        #     except DatabaseError as e:
+                        #         if 'unable to extend' in str(e):
+                        #             self.db.log.info(f'batch - :{batch_number}/{number_of_batches} \
+                        #                     is going to recursion')
+                        #             # go to recursion
+                        #             self.update_batch(batch_number, number_of_batches, lock, rows)
+                        #             return
                     elif 'the database or network closed the connection' in str(e):
                         self.db.log.info('This happens when there is a connection error between db and pumper')
                         self.db.log.info(f'db is marked unhealthy, because {e}')
@@ -201,55 +202,55 @@ class Table:
                     cursor.executemany(f"insert into {self.name} (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
                 except DatabaseError as e:
                     if 'unable to extend' in str(e):
-                        # acquire lock
-                        if not lock.locked():
-                            start = time.time()
-                            lock.acquire()
-                            try:
-                                self.db.log.info(f'Acquired lock by batch number - {batch_number}/{number_of_batches}')
-                                self.db.log.info('Failed to insert data due to lack of space in tablespace')
-                                self.tablespace.extend()
-                                cursor.executemany(f"insert into {self.name} (description, done, \
-                                    randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
-                                self.db.log.info(f'lock released by batch number- \
-                                        :{batch_number}/{number_of_batches}')
-                                lock.release()
-                                end = time.time()
-                                self.db.log.info(f'lock is held by batch \
-                                         - :{batch_number}/{number_of_batches} \
-                                         for - {end - start} secs')
-                            except DatabaseError as e:
-                                if 'unable to extend' in str(e):
-                                    lock.release()
-                                    self.db.log.info(f'batch - :{batch_number}/{number_of_batches} \
-                                            is going to recursion')
-                                    # go to recursion
-                                    self.insert_batch(batch_number, number_of_batches, lock, rows)
-                                    return
-                            except Exception as e:
-                                self.db.log.info(f'got exception - {e} - batch number - \
-                                        :{batch_number}/{number_of_batches}')
-                                lock.release()
-
-                        else:
-                            while lock.locked():
-                                sleep_time = random.randint(180, 300)
-                                self.db.log.info(f'{datetime.datetime.now()}:\
-                                        batch number - :{batch_number}/{number_of_batches}\
-                                         is going to sleep for {sleep_time} secs since \
-                                        tablespace is expanding')
-                                time.sleep(sleep_time)
-                            try:
-                                cursor.executemany(f"insert into {self.name} (description, done, \
-                                    randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
-
-                            except DatabaseError as e:
-                                if 'unable to extend' in str(e):
-                                    self.db.log.info(f'batch - :{batch_number}/{number_of_batches} \
-                                            is going to recursion')
-                                    # go to recursion
-                                    self.insert_batch(batch_number, number_of_batches, lock, rows)
-                                    return
+                        return
+                        # if not lock.locked():
+                        #     start = time.time()
+                        #     lock.acquire()
+                        #     try:
+                        #         self.db.log.info(f'Acquired lock by batch number - {batch_number}/{number_of_batches}')
+                        #         self.db.log.info('Failed to insert data due to lack of space in tablespace')
+                        #         self.tablespace.extend()
+                        #         cursor.executemany(f"insert into {self.name} (description, done, \
+                        #             randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
+                        #         self.db.log.info(f'lock released by batch number- \
+                        #                 :{batch_number}/{number_of_batches}')
+                        #         lock.release()
+                        #         end = time.time()
+                        #         self.db.log.info(f'lock is held by batch \
+                        #                  - :{batch_number}/{number_of_batches} \
+                        #                  for - {end - start} secs')
+                        #     except DatabaseError as e:
+                        #         if 'unable to extend' in str(e):
+                        #             lock.release()
+                        #             self.db.log.info(f'batch - :{batch_number}/{number_of_batches} \
+                        #                     is going to recursion')
+                        #             # go to recursion
+                        #             self.insert_batch(batch_number, number_of_batches, lock, rows)
+                        #             return
+                        #     except Exception as e:
+                        #         self.db.log.info(f'got exception - {e} - batch number - \
+                        #                 :{batch_number}/{number_of_batches}')
+                        #         lock.release()
+                        #
+                        # else:
+                        #     while lock.locked():
+                        #         sleep_time = random.randint(180, 300)
+                        #         self.db.log.info(f'{datetime.datetime.now()}:\
+                        #                 batch number - :{batch_number}/{number_of_batches}\
+                        #                  is going to sleep for {sleep_time} secs since \
+                        #                 tablespace is expanding')
+                        #         time.sleep(sleep_time)
+                        #     try:
+                        #         cursor.executemany(f"insert into {self.name} (description, done, \
+                        #             randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
+                        #
+                        #     except DatabaseError as e:
+                        #         if 'unable to extend' in str(e):
+                        #             self.db.log.info(f'batch - :{batch_number}/{number_of_batches} \
+                        #                     is going to recursion')
+                        #             # go to recursion
+                        #             self.insert_batch(batch_number, number_of_batches, lock, rows)
+                        #             return
                     elif 'the database or network closed the connection' in str(e):
                         self.db.log.info('This happens when there is a connection error between db and pumper')
                         self.db.log.info(f'db is marked unhealthy, because {e}')
