@@ -15,6 +15,9 @@ class DB:
         self.host = host
         self.username = username
         self.password = password
+        self.autoextend = False
+        if "sin" in self.db_name.lower():
+            self.autoextend = True
         self.log = set_logger(f"{self.host.ip}_{self.db_name}", 'dbs')
         self.is_healthy = True
         self.connection = self.connect()

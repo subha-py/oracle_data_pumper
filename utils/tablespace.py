@@ -5,10 +5,9 @@ from string import ascii_letters
 import string
 from utils.memory import human_read_to_byte, bytes_to_human_read
 class Tablespace:
-    def __init__(self, db, table, data_filesize='2G',name=None, autoextend=False, random_size=True):
+    def __init__(self, db, table, data_filesize='2G',name=None, random_size=True):
         self.name = name
         self.data_filesize = data_filesize
-        self.autoextend = autoextend
         self.random_size = random_size
         self.db = db
         self.table = table
@@ -16,6 +15,10 @@ class Tablespace:
         if not self.is_created():
             self.create()
         self.datafile_basename = self.get_datafile_basename()
+        self.data_filesize = self.get_datafile_size()
+
+    def get_datafile_size(self):
+        return "200G" if self.db.autoextend else self.data_filesize
 
     def get_datafile_basename(self):
         if self.name is None:
@@ -75,11 +78,15 @@ class Tablespace:
     def create(self):
         self.name = f"{self.table.name}ts"
         self.datafile_basename = self.get_datafile_basename()
-        if self.autoextend:
-            # todo create big tablespace when autotextend is true
-            cmd = (f"""create tablespace {self.name} \
-                    datafile '{self.create_random_datafile_name()}' size {self.data_filesize} AUTOEXTEND 
-                    ON NEXT {self.data_filesize} EXTENT MANAGEMENT LOCAL SEGMENT SPACE MANAGEMENT AUTO""")
+        if self.db.autoextend:
+            cmd = (f"""CREATE BIGFILE TABLESPACE {self.name} 
+                               DATAFILE '{self.create_random_datafile_name()}' 
+                               SIZE {self.data_filesize} 
+                               AUTOEXTEND ON 
+                               NEXT {self.data_filesize} 
+                               EXTENT MANAGEMENT LOCAL 
+                               SEGMENT SPACE MANAGEMENT AUTO""")
+
         else:
             cmd = (f"create tablespace {self.name} \
                 datafile '{self.create_random_datafile_name()}' size {self.get_new_size()}")
