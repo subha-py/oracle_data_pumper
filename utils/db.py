@@ -10,7 +10,7 @@ from utils.memory import human_read_to_byte
 from threading import Lock
 import time
 class DB:
-    def __init__(self, db_name, host, username='sys', password='cohesity', type='standalone'):
+    def __init__(self, db_name, host, username='sys', password='cohesity'):
         self.db_name = db_name
         self.host = host
         self.username = username

@@ -10,7 +10,6 @@ import datetime
 import pathlib
 from utils.tablespace import Tablespace
 from string import ascii_letters
-
 class Table:
     def __init__(self, db, name=None):
         self.name = name
@@ -80,7 +79,6 @@ class Table:
                 rows.append(self.create_row())
         self.db.log.info(f"inserting into {self.name}: batch_number: {batch_number}/{number_of_batches}")
         with self.db.connection.cursor() as cursor:
-            cursor.setinputsizes(24, DB_TYPE_BOOLEAN, DB_TYPE_NUMBER, 10)
             try:
                 cursor.executemany(f"insert into {self.name} (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
             except DatabaseError as e:
@@ -285,3 +283,10 @@ def create_todo_item_table(connection, db_name, datafile_size,
             create_single_todoitem_table(connection, db_name, tablename, tablespace_name, datafile_size, autoextend)
     else:
         print("Tables already exist. Skipping creation.")
+
+if __name__ == '__main__':
+    from utils.connection import connect_to_oracle
+    conn = connect_to_oracle('10.131.37.211', 'PROD1')
+    tables = ['todoitemqSzP', 'todoitemoyQG', 'todoitemIWrq', 'todoitemhJDc', 'todoitemyBIY', 'todoitemktVN', 'todoitemSzOJ', 'todoitemwNEx', 'todoitemQhNk']
+    for table in tables:
+        delete_todoitem_table(conn, table)

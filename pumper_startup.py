@@ -10,6 +10,7 @@ from utils.cohesity import get_registered_sources, get_cluster_name
 import logging
 import concurrent.futures
 import argparse
+from utils.hosts import Host
 def pull_latest_code(repo_path="."):
     logger = logging.getLogger(os.environ.get("log_file_name"))
     logger.info(f"Attempting to pull latest code in: {os.path.abspath(repo_path)}")
@@ -31,6 +32,7 @@ def dump_logs_to_pluto(cluster_ip, logdir=None):
     )
 
 def startup_activities(cluster_ip):
+
     hosts = get_registered_sources(cluster_ip=cluster_ip)
     # todo: remove rac from this list - should have rac in its name
     # todo: datapump in pdbs - should have cdb in its name
@@ -54,7 +56,7 @@ def startup_activities(cluster_ip):
                 print(f"Batch {host} failed: {exc}")
     # at this point all pumpable dbs are prepared
     all_scheduled_dbs = []
-
+    # todo: revert me
     for host in hosts:
         all_scheduled_dbs.extend(host.scheduled_dbs)
     random.shuffle(all_scheduled_dbs)
