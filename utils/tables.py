@@ -17,6 +17,7 @@ class Table:
         self.db = db
         self.batch_size = self.db.host.batch_size
         self.random_size = False
+        self.is_healthy = True
         if self.is_created():
             # when table is already present no need to create a new one
             self.tablespace = Tablespace(db=self.db, table=self)
@@ -102,8 +103,8 @@ class Table:
                     """, rows, batcherrors=True)
                 except DatabaseError as e:
                     if 'unable to extend' in str(e):
-                        self.db.log.info(f'reached end of file skipping txn - {self.name}')
-                        self.db.is_healthy = False
+                        self.db.log.info(f'reached end of file skipping txn, marking table is unhealthy - {self.name}')
+                        self.is_healthy = False
                         return
                         # acquire lock
                         # if not lock.locked():
@@ -204,8 +205,8 @@ class Table:
                     cursor.executemany(f"insert into {self.name} (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
                 except DatabaseError as e:
                     if 'unable to extend' in str(e):
-                        self.db.log.info(f'reached end of file skipping txn - {self.name}')
-                        self.db.is_healthy = False
+                        self.db.log.info(f'reached end of file skipping txn - {self.name}, marking table is unhealthy ')
+                        self.is_healthy = False
                         return
                         # if not lock.locked():
                         #     start = time.time()

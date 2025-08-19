@@ -222,7 +222,11 @@ class DB:
     # @profile
     def process_batch(self):
         if self.is_healthy:
-            table_obj = random.choice(self.tables)
+            healthy_tables = []
+            for table in self.tables:
+                if table.is_healthy:
+                    healthy_tables.append(table)
+            table_obj = random.choice(healthy_tables)
             self.host.curr_number_of_batch += 1
             if self.host.update_rows:
                 table_obj.update_batch(self.host.curr_number_of_batch, self.host.total_number_of_batches, self.lock)
