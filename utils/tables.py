@@ -102,6 +102,7 @@ class Table:
                     """, rows, batcherrors=True)
                 except DatabaseError as e:
                     if 'unable to extend' in str(e):
+                        self.db.log.info('reached end of file skipping txn')
                         return
                         # acquire lock
                         # if not lock.locked():
@@ -202,6 +203,7 @@ class Table:
                     cursor.executemany(f"insert into {self.name} (description, done, randomnumber, randomstring) values(:1, :2, :3, :4)", rows)
                 except DatabaseError as e:
                     if 'unable to extend' in str(e):
+                        self.db.log.info('reached end of file skipping txn')
                         return
                         # if not lock.locked():
                         #     start = time.time()
