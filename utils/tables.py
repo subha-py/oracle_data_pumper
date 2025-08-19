@@ -204,6 +204,7 @@ class Table:
                 except DatabaseError as e:
                     if 'unable to extend' in str(e):
                         self.db.log.info('reached end of file skipping txn')
+                        self.db.is_healthy = False
                         return
                         # if not lock.locked():
                         #     start = time.time()
