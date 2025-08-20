@@ -287,12 +287,21 @@ class Table:
 
     def get_row_count(self):
         if self.db.host.update_rows:
+            if self.db.row_count_map.get(self.name).get('row_count') is not None:
+                self.db.log.info(f'Got row_count from row_count_map - {self.name}')
+                return self.db.row_count_map.get(self.name).get('row_count')
             cmd = f'SELECT COUNT(*) AS row_count FROM {self.name}'
             return self.db.run_query(cmd)[0][0]
         else:
             return 0
     def get_id_range(self):
         if self.db.host.update_rows:
+            if self.db.row_count_map.get(self.name).get('lowest_id') is not None and \
+                    self.db.row_count_map.get(self.name).get('highest_id') is not None:
+                self.db.log.info(f'Got lowest id and highest id from row_count_map - {self.name}')
+                self.lowest_id = self.db.row_count_map.get(self.name).get('lowest_id')
+                self.highest_id = self.db.row_count_map.get(self.name).get('highest_id')
+                return
             cmd = f'SELECT MIN(id) AS lowest_id, MAX(id) AS highest_id FROM {self.name}'
             output = self.db.run_query(cmd)[0]
             self.lowest_id, self.highest_id = output[0], output[1]

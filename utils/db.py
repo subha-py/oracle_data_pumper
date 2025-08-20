@@ -41,7 +41,8 @@ class DB:
             'TODOITEMTGVL': {'highest_id': 591644114, 'lowest_id': 1, 'row_count': 591330000},
             'TODOITEMUYXY': {'highest_id': 594065602, 'lowest_id': 1, 'row_count': 593810000},
             'TODOITEMVLJF': {'highest_id': 588585239, 'lowest_id': 1, 'row_count': 588060000},
-            'TODOITEMVVPP': {'highest_id': 588737164, 'lowest_id': 1, 'row_count': 588380000}
+            'TODOITEMVVPP': {'highest_id': 588737164, 'lowest_id': 1, 'row_count': 588380000},
+            'TODOITEMYXJH': {'highest_id': 10000, 'lowest_id': 1, 'row_count': 10000}
         }
         self.get_tables()
         self.row_count = self.tables_all_row_count()
