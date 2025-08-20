@@ -25,6 +25,24 @@ class DB:
         self.fra_limit_set = None
         self.db_files_limit_set = None
         self.lock = Lock()
+        self.row_count_map = {
+            'TODOITEMBGHO': {'highest_id': 595128575, 'lowest_id': 1, 'row_count': 594550000},
+            'TODOITEMDBXV': {'highest_id': 585904047, 'lowest_id': 1, 'row_count': 585260000},
+            'TODOITEMFFCK': {'highest_id': 591472901, 'lowest_id': 1, 'row_count': 591170000},
+            'TODOITEMGUCK': {'highest_id': 596512204, 'lowest_id': 1, 'row_count': 596240000},
+            'TODOITEMGXSE': {'highest_id': 597386478, 'lowest_id': 1, 'row_count': 596890000},
+            'TODOITEMHFLS': {'highest_id': 593762127, 'lowest_id': 1, 'row_count': 593440000},
+            'TODOITEMJJPC': {'highest_id': 595158132, 'lowest_id': 1, 'row_count': 594470000},
+            'TODOITEMLTFE': {'highest_id': 589771526, 'lowest_id': 1, 'row_count': 589190000},
+            'TODOITEMNJVB': {'highest_id': 596030540, 'lowest_id': 1, 'row_count': 595590000},
+            'TODOITEMODUY': {'highest_id': 593796157, 'lowest_id': 1, 'row_count': 593360000},
+            'TODOITEMOLJF': {'highest_id': 581818615, 'lowest_id': 1, 'row_count': 581520000},
+            'TODOITEMRMYF': {'highest_id': 590519245, 'lowest_id': 1, 'row_count': 590240000},
+            'TODOITEMTGVL': {'highest_id': 591644114, 'lowest_id': 1, 'row_count': 591330000},
+            'TODOITEMUYXY': {'highest_id': 594065602, 'lowest_id': 1, 'row_count': 593810000},
+            'TODOITEMVLJF': {'highest_id': 588585239, 'lowest_id': 1, 'row_count': 588060000},
+            'TODOITEMVVPP': {'highest_id': 588737164, 'lowest_id': 1, 'row_count': 588380000}
+        }
         self.get_tables()
         self.row_count = self.tables_all_row_count()
 
