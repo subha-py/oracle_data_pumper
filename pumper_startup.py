@@ -62,7 +62,7 @@ def startup_activities(cluster_ip):
     random.shuffle(all_scheduled_dbs)
     future_to_dbs = {}
     result = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1024) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
         for db in all_scheduled_dbs:
                 future = executor.submit(db.process_batch)
                 future_to_dbs[future] = str(db)
