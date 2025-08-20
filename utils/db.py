@@ -20,7 +20,7 @@ class DB:
         self.connection = self.connect()
         self.connection_pool = self.get_connect_pool()
         # todo revert me
-        self.target_table_count = 16
+        self.target_table_count = 1
         self.tables = []
         self.fra_limit_set = None
         self.db_files_limit_set = None
