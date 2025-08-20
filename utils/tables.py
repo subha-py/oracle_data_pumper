@@ -98,7 +98,7 @@ class Table:
         with self.db.connection_pool.acquire() as connection:
             with connection.cursor() as cursor:
                 try:
-                    dop = 4
+                    dop = 16
                     cursor.execute('ALTER SESSION ENABLE PARALLEL DML')
                     cursor.execute(f'ALTER TABLE {self.name} PARALLEL 4')
                     cursor.executemany(f"""
