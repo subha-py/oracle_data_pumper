@@ -104,7 +104,7 @@ class Table:
                                randomnumber = :3,
                                randomstring = :4
                          WHERE id = :5
-                    """, rows)
+                    """, rows, batcherrors=True)
                 except DatabaseError as e:
                     if 'unable to extend' in str(e):
                         self.db.log.info(f'reached end of file skipping txn, marking table is unhealthy - {self.name}')
