@@ -88,6 +88,7 @@ class Table:
         return random.randint(self.lowest_id, self.highest_id)
 
     def update_batch(self, batch_number, number_of_batches, lock, rows=None):
+
         self.db.log.info(f"updating into {self.name}: batch_number: {batch_number}/{number_of_batches}")
         if rows is None:
             rows = []
@@ -97,8 +98,10 @@ class Table:
         with self.db.connection_pool.acquire() as connection:
             with connection.cursor() as cursor:
                 try:
+                    dop = 4
                     cursor.executemany(f"""
-                        UPDATE {self.name}
+                        UPDATE /*+ PARALLEL({self.name} {dop}) */
+                           {self.name}
                            SET description = :1,
                                done = :2,
                                randomnumber = :3,
