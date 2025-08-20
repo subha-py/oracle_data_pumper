@@ -57,7 +57,6 @@ def startup_activities(cluster_ip):
                 print(f"Batch {host} failed: {exc}")
     # at this point all pumpable dbs are prepared
     all_scheduled_dbs = []
-    # todo: revert me
     for host in hosts:
         all_scheduled_dbs.extend(host.scheduled_dbs)
     random.shuffle(all_scheduled_dbs)

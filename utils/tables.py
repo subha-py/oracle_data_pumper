@@ -28,6 +28,9 @@ class Table:
                 self.name = f"todoitem{random_string}"
             self.create()
         self.row_count = self.get_row_count()
+        self.lowest_id = 0
+        self.highest_id = 0
+        self.get_id_range()
     def is_created(self):
         if self.name is None:
             return False
@@ -64,16 +67,16 @@ class Table:
                                 TABLESPACE {self.tablespace.name}""")
         self.db.log.info(f"Created table {self.name}")
 
-    def create_row(self, row_id=None):
+    def create_row(self, row_id_required=False):
         ascii_letters = list(string.ascii_letters)
         task_number = random.randint(1, sys.maxsize)
         random_string = ''.join(random.choices(ascii_letters, k=10))
         toggle = random.choice([True, False])
-        if row_id is None:
-         return f'Task:{random.randint(0, sys.maxsize) + 1}', toggle, task_number, random_string
-        else:
+        if row_id_required:
+            row_id = random.randint(self.lowest_id, self.highest_id)
             return f'Task:{random.randint(0, sys.maxsize) + 1}', toggle, task_number, random_string, row_id
-
+        else:
+            return f'Task:{random.randint(0, sys.maxsize) + 1}', toggle, task_number, random_string
     def get_random_ids(self):
         cmd = (f"""
             SELECT id FROM (
@@ -82,14 +85,15 @@ class Table:
         """)
         ids = [row[0] for row in self.db.run_query(cmd)]
         return ids
+    def get_random_id_queryless(self):
+        return random.randint(self.lowest_id, self.highest_id)
 
     def update_batch(self, batch_number, number_of_batches, lock, rows=None):
         self.db.log.info(f"updating into {self.name}: batch_number: {batch_number}/{number_of_batches}")
         if rows is None:
             rows = []
-            ids = self.get_random_ids()
-            for id in ids:
-                rows.append(self.create_row(row_id=id))
+            for _ in range(self.batch_size):
+                rows.append(self.create_row(row_id_required=True))
         with self.db.connection_pool.acquire() as connection:
             with connection.cursor() as cursor:
                 try:
@@ -287,6 +291,12 @@ class Table:
             return self.db.run_query(cmd)[0][0]
         else:
             return 0
+    def get_id_range(self):
+        if self.db.host.update_rows:
+            cmd = f'SELECT MIN(id) AS lowest_id, MAX(id) AS highest_id FROM {self.name}'
+            output = self.db.run_query(cmd)[0]
+            self.lowest_id, self.highest_id = output[0], output[1]
+            return output
     def __repr__(self):
         return self.name
 
