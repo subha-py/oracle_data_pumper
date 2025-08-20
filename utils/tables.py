@@ -67,13 +67,12 @@ class Table:
                                 TABLESPACE {self.tablespace.name}""")
         self.db.log.info(f"Created table {self.name}")
 
-    def create_row(self, row_id_required=False):
+    def create_row(self, row_id=None):
         ascii_letters = list(string.ascii_letters)
         task_number = random.randint(1, sys.maxsize)
         random_string = ''.join(random.choices(ascii_letters, k=10))
         toggle = random.choice([True, False])
-        if row_id_required:
-            row_id = random.randint(self.lowest_id, self.highest_id)
+        if row_id is not None:
             return f'Task:{random.randint(0, sys.maxsize) + 1}', toggle, task_number, random_string, row_id
         else:
             return f'Task:{random.randint(0, sys.maxsize) + 1}', toggle, task_number, random_string
@@ -92,8 +91,9 @@ class Table:
         self.db.log.info(f"updating into {self.name}: batch_number: {batch_number}/{number_of_batches}")
         if rows is None:
             rows = []
-            for _ in range(self.batch_size):
-                rows.append(self.create_row(row_id_required=True))
+            random_row = random.randint(self.lowest_id, abs(self.highest_id-self.batch_size)+1)
+            for row_id in range(random_row, random_row+self.batch_size):
+                rows.append(self.create_row(row_id=row_id))
         with self.db.connection_pool.acquire() as connection:
             with connection.cursor() as cursor:
                 try:
@@ -104,7 +104,7 @@ class Table:
                                randomnumber = :3,
                                randomstring = :4
                          WHERE id = :5
-                    """, rows, batcherrors=True)
+                    """, rows)
                 except DatabaseError as e:
                     if 'unable to extend' in str(e):
                         self.db.log.info(f'reached end of file skipping txn, marking table is unhealthy - {self.name}')
