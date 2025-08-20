@@ -99,6 +99,8 @@ class Table:
             with connection.cursor() as cursor:
                 try:
                     dop = 4
+                    cursor.execute('ALTER SESSION ENABLE PARALLEL DML')
+                    cursor.execute(f'ALTER TABLE {self.name} PARALLEL 4')
                     cursor.executemany(f"""
                         UPDATE /*+ PARALLEL({self.name} {dop}) */
                            {self.name}
