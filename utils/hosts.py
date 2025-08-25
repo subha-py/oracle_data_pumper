@@ -57,7 +57,7 @@ class Host:
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
-            vc = 'system-test-vc-fitdb.qa01.eng.cohesity.com'
+            vc = 'system-test-vcfitdb.qa01.eng.cohesity.com'
             si = SmartConnect(host=vc, user='administrator@vsphere.local', pwd='Cohe$1ty', sslContext=context)
             content = si.RetrieveContent()
             vm = None
