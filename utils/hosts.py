@@ -26,7 +26,7 @@ class Host:
         self.timeout = 10*60
         self.is_healthy = True
         self.pumpable_dbs = []
-        self.pump_size_in_gb = '10G'
+        self.pump_size_in_gb = '2G'
         self.batch_size = 10000
         self.total_rows_required = get_number_of_rows_from_file_size(self.pump_size_in_gb)
         self.total_number_of_batches = self.total_rows_required // self.batch_size
