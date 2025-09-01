@@ -11,8 +11,18 @@ import logging
 import concurrent.futures
 import argparse
 from utils.hosts import Host
-
-MAX_RUNTIME = 12 * 60 * 60
+def pull_latest_code(repo_path="."):
+    logger = logging.getLogger(os.environ.get("log_file_name"))
+    logger.info(f"Attempting to pull latest code in: {os.path.abspath(repo_path)}")
+    if not os.path.isdir(os.path.join(repo_path, '.git')):
+        logger.info(f"Error: {repo_path} is not a Git repository.")
+        return False
+    result = subprocess.run(
+        ['git', 'pull', '-r'],
+        cwd=repo_path,
+    )
+    logger.info("Git pull successful!")
+    return result
 def dump_logs_to_pluto(cluster_ip, logdir=None):
     cluster_name = get_cluster_name(cluster_ip)
     if logdir is None:
@@ -31,44 +41,37 @@ def startup_activities(cluster_ip):
     # todo: mark unhealthy if oradata is missing
     # todo: do this for windows machine
     future_to_hosts = {}
-
-    MAX_RUNTIME = 12*60*60
-    with concurrent.futures.ProcessPoolExecutor(max_workers=len(hosts)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
         for host in hosts:
                 future = executor.submit(host.reboot_and_prepare)
                 future_to_hosts[future] = host
         result = []
-        for future in concurrent.futures.as_completed(future_to_hosts, timeout=MAX_RUNTIME):
+        for future in concurrent.futures.as_completed(future_to_hosts):
             host = future_to_hosts[future]
             try:
-                res = future.result(timeout=MAX_RUNTIME)
+                res = future.result()
                 if not res:
                     result.append(host)
-            except concurrent.futures.TimeoutError:
-                print(f"Batch {host} exceeded {MAX_RUNTIME} seconds, killing...")
-                future.cancel()
             except Exception as exc:
                 print(f"Batch {host} failed: {exc}")
     # at this point all pumpable dbs are prepared
     all_scheduled_dbs = []
+    # todo: revert me
     for host in hosts:
         all_scheduled_dbs.extend(host.scheduled_dbs)
     random.shuffle(all_scheduled_dbs)
     future_to_dbs = {}
     result = []
-    with concurrent.futures.ProcessPoolExecutor(max_workers=512) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=512) as executor:
         for db in all_scheduled_dbs:
                 future = executor.submit(db.process_batch)
                 future_to_dbs[future] = str(db)
-        for future in concurrent.futures.as_completed(future_to_dbs, timeout=MAX_RUNTIME):
+        for future in concurrent.futures.as_completed(future_to_dbs):
             db = future_to_dbs[future]
             try:
-                res = future.result(timeout=MAX_RUNTIME)
+                res = future.result()
                 if not res:
                     result.append(db)
-            except concurrent.futures.TimeoutError:
-                print(f"Batch {db} exceeded {MAX_RUNTIME} seconds, killing...")
-                future.cancel()
             except Exception as exc:
                 print(f"Batch {db} failed: {exc}")
 
