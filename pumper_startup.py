@@ -2,6 +2,8 @@
 # /etc/systemd/system/pumper-startup.service uses this file in pumper
 import random
 import sys
+import threading
+
 from utils.log import scp_to_remote
 from utils.reports import create_report
 import os
@@ -62,18 +64,24 @@ def startup_activities(cluster_ip):
     random.shuffle(all_scheduled_dbs)
     future_to_dbs = {}
     result = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=512) as executor:
+    stop_event = threading.Event()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)*32) as executor:
         for db in all_scheduled_dbs:
-                future = executor.submit(db.process_batch)
+                args = [stop_event]
+                future = executor.submit(db.process_batch, *args)
                 future_to_dbs[future] = str(db)
-        for future in concurrent.futures.as_completed(future_to_dbs):
-            db = future_to_dbs[future]
-            try:
-                res = future.result()
-                if not res:
-                    result.append(db)
-            except Exception as exc:
-                print(f"Batch {db} failed: {exc}")
+        try:
+            for future in concurrent.futures.as_completed(future_to_dbs, timeout = 12*60*60):
+                db = future_to_dbs[future]
+                try:
+                    res = future.result()
+                    if not res:
+                        result.append(db)
+                except Exception as exc:
+                    print(f"Batch {db} failed: {exc}")
+        except concurrent.futures.TimeoutError:
+            print("Global timeout reached, signalling stop...")
+            stop_event.set()
 
     create_report(hosts, cluster_ip)
     dump_logs_to_pluto(cluster_ip)

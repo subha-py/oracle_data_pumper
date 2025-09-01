@@ -191,13 +191,16 @@ class DB:
         return self.is_healthy
 
     # @profile
-    def process_batch(self):
-        if self.is_healthy:
+    def process_batch(self, stop_event):
+        if self.is_healthy and not stop_event.is_set():
             table_obj = random.choice(self.tables)
             self.host.curr_number_of_batch += 1
             table_obj.insert_batch(self.host.curr_number_of_batch, self.host.total_number_of_batches, self.lock)
         else:
-            self.log.info('db is not healthy skipping transaction')
+            if not self.is_healthy:
+                self.log.info('db is not healthy skipping transaction')
+            elif stop_event.is_set():
+                self.log.info('Timeout reached, cancelling batches')
             self.host.failed_number_of_batch += 1
     def __repr__(self):
         return f"{self.host}_{self.db_name}"
