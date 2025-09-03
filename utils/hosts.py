@@ -37,7 +37,7 @@ class Host:
         self.services = ['oracle-database.service', 'oracle-listener.service']
         self.is_rac = False
         self.rac_nodes = []
-        self.update_rows = True #todo: check queries to decide on this attribute
+        self.update_rows = False #todo: check queries to decide on this attribute
         self.total_actual_rows = 0
 
     def ping(self):
