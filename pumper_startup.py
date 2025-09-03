@@ -71,7 +71,7 @@ def startup_activities(cluster_ip):
                 future = executor.submit(db.process_batch, *args)
                 future_to_dbs[future] = str(db)
         try:
-            for future in concurrent.futures.as_completed(future_to_dbs, timeout = 12*60*60):
+            for future in concurrent.futures.as_completed(future_to_dbs, timeout = 20*60*60):
                 db = future_to_dbs[future]
                 try:
                     res = future.result()
