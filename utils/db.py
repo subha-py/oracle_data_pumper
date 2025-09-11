@@ -21,6 +21,7 @@ class DB:
         self.log = set_logger(f"{self.host.ip}_{self.db_name}", 'dbs')
         self.is_healthy = True
         self.connection = self.connect()
+        self.connection.callTimeout = 3600000  # 1 hour in milliseconds
         self.target_table_count = 25
         self.tables = []
         self.fra_limit_set = None
