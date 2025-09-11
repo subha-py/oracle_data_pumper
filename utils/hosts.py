@@ -77,8 +77,8 @@ class Host:
                 reboot_vm(vm, si)
                 self.wait_for_ping()
                 Disconnect(si)
-                self.log.info('Sleeping 5 mins before querying dbs ')
-                time.sleep(5 * 60)
+                self.log.info('Sleeping 15 mins before querying dbs ')
+                time.sleep(15 * 60)
 
             else:
                 self.log.warning(f"VM with IP {self.ip} not found.")
