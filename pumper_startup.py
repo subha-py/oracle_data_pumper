@@ -40,7 +40,7 @@ def startup_activities(cluster_ip):
     # todo: add install agent if required
     # todo: mark unhealthy if oradata is missing
     # todo: do this for windows machine
-    hosts = [Host('10.14.27.120')]
+    hosts = [Host('10.14.69.185')]
     future_to_hosts = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(hosts)) as executor:
         for host in hosts:
