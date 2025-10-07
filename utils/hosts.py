@@ -318,7 +318,7 @@ class Host:
     def reboot_and_prepare(self):
         self.prepare_services()
         self.change_oratab_entries()
-        self.reboot()
+        # self.reboot()
 
         self.prepare_pump_eligible_dbs()
         self.set_pumper_tasks()
