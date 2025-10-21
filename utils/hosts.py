@@ -74,7 +74,7 @@ class Host:
             if vm:
                 self.log.info(f"Found VM: {vm.name}")
                 self.vm_name = vm.name
-                reboot_vm(vm, si)
+                # reboot_vm(vm, si)
                 self.wait_for_ping()
                 Disconnect(si)
                 self.log.info('Sleeping 15 mins before querying dbs ')
